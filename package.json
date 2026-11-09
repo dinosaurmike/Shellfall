@@ -1,0 +1,15 @@
+{
+  "name": "shellfall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pixel artillery on a world you can blow apart, flood, freeze and set on fire, one grain at a time.",
+  "scripts": {
+    "serve": "node tools/serve.js",
+    "normalize": "node tools/normalize.js index.html",
+    "test": "node tests/run.js",
+    "test:quick": "node tests/run.js quick"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
