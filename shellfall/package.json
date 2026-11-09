@@ -1,0 +1,20 @@
+{
+  "name": "shellfall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pixel artillery on a world you can blow apart, flood, freeze and set on fire, one grain at a time.",
+  "scripts": {
+    "serve": "node tools/serve.js",
+    "normalize": "node tools/normalize.js index.html",
+    "test": "node tests/run.js",
+    "test:quick": "node tests/run.js quick",
+    "emulators": "firebase emulators:start --only database,auth --project demo-shellfall",
+    "test:firebase": "node tests/run.js firebase",
+    "deploy": "firebase deploy --only hosting,database"
+  },
+  "devDependencies": {
+    "firebase": "13.1.0",
+    "firebase-tools": "^15.35.0",
+    "playwright": "^1.63.0"
+  }
+}
