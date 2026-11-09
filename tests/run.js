@@ -14,6 +14,7 @@ const TESTS = [
   ['day-game', 'Day games: lobby, join, alternating turns, leave and come back later (mock db)', true],
   ['day-rounds', 'Day games: round over and the next round started by another player', false],
   ['day-manager', 'Day game manager: leave (bot takes over), end, hide, delete', true],
+  ['touch', 'Phones in landscape: thumb-zone layout, thumb-stick aim, pinch zoom, weapon tray, double-tap', true],
   ['menu-flow', 'Title screen disclosure, pause, exit to menu and play again', true],
   ['drive', 'Tanks can drive both ways on many maps', true],
   ['ledge', 'Ledge warning stops once, the next push goes over', false],

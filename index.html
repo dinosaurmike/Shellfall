@@ -1,5 +1,6 @@
 <title>Shellfall</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800;900&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Silkscreen:wght@400;700&family=Special+Elite&display=swap">
@@ -25,7 +26,7 @@
 }
 html,body{height:100%}
 [hidden]{display:none!important}
-body{background:var(--ink);color:var(--text);font-family:var(--f-ui);font-size:15px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--f-ui);font-size:15px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{position:relative;width:100%;height:100%;overflow:hidden}
 #gl,#view{position:absolute;inset:0;width:100%;height:100%;display:block}
 #view{cursor:crosshair}
@@ -278,7 +279,7 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
 .card .setting .seg{justify-self:end;justify-content:flex-end}
 .status{max-width:min(320px,34vw)}
 .status .eyebrow,.status .turn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media (max-height:520px),(max-width:700px){
+@media (max-width:700px) and (min-height:541px){
   .hud.top{padding-block:6px 0}
   .hud.bottom{gap:6px;padding-bottom:6px}
   .chip,.group,.icon-btn,.ticker{box-shadow:inset 1px 1px 0 var(--plate-hi),inset -1px -1px 0 var(--plate-lo),0 0 0 2px #080907}
@@ -320,6 +321,47 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
 .card .dayrow .sub{display:block;font-size:12px;color:#6a5e47}
 .card .dayhead{display:flex;justify-content:space-between;align-items:baseline;font:12px var(--f-pix);color:#6a5e47;margin-top:4px}
 @media (max-height:520px),(max-width:700px){ .order{display:none} }
+/* ===== Phones in landscape: battlefield in the middle, controls under the thumbs ===== */
+.wpick{display:none}
+.windmini{display:none}
+@media (max-height:540px) and (orientation:landscape){
+  .hud.top{padding-block:max(6px,env(safe-area-inset-top,0px)) 0}
+  .status{max-width:min(240px,30vw);padding:4px 9px}
+  .status .eyebrow{font-size:8px}
+  .status .turn{font-size:12px}
+  .windmini{display:block;font:400 10px var(--f-pix);color:#c9c3a8}
+  .ticker{min-height:30px;padding:3px 8px 3px 4px;width:min(360px,40vw)}
+  .ticker canvas{width:22px;height:22px}
+  .ticker .tk{font-size:10px}
+  .icon-btn{width:40px;height:40px}
+  .hud.bottom{position:absolute;inset:auto 0 0 0;height:0;padding:0;display:block}
+  .hud.bottom > *{position:absolute}
+  #grpWind{display:none}
+  .group{padding:4px 6px;gap:4px}
+  .hud .btn.sm{min-width:44px;min-height:44px;width:44px;height:44px;font-size:17px}
+  .dial{width:52px;height:28px}
+  .group .val{font-size:11px}
+  .meter{width:52px}
+  #grpMove{left:max(10px,env(safe-area-inset-left,0px));bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  .wpick{display:flex;align-items:center;gap:6px;left:max(10px,env(safe-area-inset-left,0px));bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 64px);min-height:44px;padding:0 10px;max-width:190px}
+  .wpick .wpi svg{width:20px;height:20px;display:block}
+  .wpick .wpn{font:700 11px var(--f-pix);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wpick .wpa{font:400 10px var(--f-pix);color:var(--amber)}
+  .wstrip{display:none;left:max(10px,env(safe-area-inset-left,0px));bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 116px);width:auto;flex-basis:auto}
+  .hud.bottom.tray .wstrip{display:flex}
+  .wlabel{display:none}
+  .wbtns{display:grid;grid-template-columns:repeat(6,44px);overflow:visible;max-width:none}
+  .wbtn{width:44px;height:44px}
+  .wbtn svg{width:20px;height:20px}
+  #btnFire{right:max(10px,env(safe-area-inset-right,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));width:92px;min-width:92px;height:112px;min-height:112px;padding:0;font-size:22px}
+  #grpPower{right:calc(max(10px,env(safe-area-inset-right,0px)) + 100px);bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  #grpAngle{right:calc(max(10px,env(safe-area-inset-right,0px)) + 100px);bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 62px)}
+  .wormbar{right:calc(max(10px,env(safe-area-inset-right,0px)) + 100px);bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 124px)}
+  .notice{bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 4px);max-width:min(380px,calc(100% - 560px));min-width:200px}
+}
+@media (max-height:540px) and (orientation:landscape) and (max-width:720px){
+  .notice{max-width:calc(100% - 32px);bottom:auto;top:56px}
+}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:reduce){
   .banner,.kc .bar{animation:none}
@@ -333,11 +375,12 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
 
   <div class="hud top" id="hudTop">
     <div class="lft">
-      <div class="chip status"><span class="eyebrow" id="roundLbl">Shellfall</span><span class="turn" id="turnLbl">Ready</span><div class="order" id="order" aria-label="Turn order"></div></div>
+      <div class="chip status"><span class="eyebrow" id="roundLbl">Shellfall</span><span class="turn" id="turnLbl">Ready</span><span class="windmini" id="windMini"></span><div class="order" id="order" aria-label="Turn order"></div></div>
       <button class="chip netchip" id="netChip" hidden><span class="eyebrow" id="netLbl">Join code</span><span class="code" id="netCode">0000</span></button>
     </div>
     <div class="ticker" id="ticker" aria-live="polite"><canvas id="tkFace" width="12" height="12" aria-hidden="true"></canvas><span class="tk" id="tkText"></span><span class="wx" id="wxVal" hidden></span></div>
     <div class="rgt">
+      <button class="icon-btn ffchip" id="btnFit" title="See the whole map (Z, or double-tap)" aria-label="See the whole map" hidden>&#10530;</button>
       <button class="icon-btn ffchip" id="btnFF" aria-pressed="false" title="Speed up other crews' turns (F)" hidden>&#9654;&#9654;</button>
       <button class="icon-btn" id="btnThermal" aria-label="Thermal vision" aria-pressed="false" title="Thermal vision (T)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/></svg>
@@ -352,6 +395,7 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
   </div>
 
   <div class="hud bottom idle" id="hudBottom">
+    <button class="btn wpick" id="wpick" aria-expanded="false" aria-controls="wstrip"><span class="wpi" id="wpickIcon"></span><span class="wpn" id="wpickName">Thumper</span><span class="wpa" id="wpickAmmo"></span></button>
     <div class="wstrip" id="wstrip">
       <div class="wlabel" id="wlabel"><span class="wl-name" id="wName">Shell</span><span class="wl-verb" id="wVerb">Blast</span><span class="wl-d" id="wDesc"></span><span class="wl-keys">Q / E</span></div>
       <div class="wbtns" id="wbtns" role="toolbar" aria-label="Weapons"></div>
@@ -729,7 +773,7 @@ const CURATED = [
   { k: 'lantern', name: 'Lantern Point', theme: 'ruins', seed: 1201 }, { k: 'breakwater', name: 'The Breakwater', theme: 'ruins', seed: 5113 },
 ];
 const RULE_DEFAULTS = { wind: 'changing', gravity: 'normal', sand: true, water: true, fallDmg: true, fuel: 'normal', weather: 'changing', tide: 'off', keep: false, worm: 'off', bots: 3, skill: 'mixed', teams: 'off', theme: 'random', mode: 'match', time: 'cycle', director: true, abyss: 'auto', map: 'random' };
-const LOCAL_DEFAULTS = { aim: 'short', killcam: true, slowmo: true, sound: true, music: true, gfx: 'auto', palette: 'vivid', teamcol: 'standard', pixels: 'limited' };
+const LOCAL_DEFAULTS = { haptics: true, aim: 'short', killcam: true, slowmo: true, sound: true, music: true, gfx: 'auto', palette: 'vivid', teamcol: 'standard', pixels: 'limited' };
 const PRESETS = [
   { name: 'Classic', d: 'Wind each turn, crumbling ground, clear skies. Scorched Earth feel.', v: { wind: 'changing', gravity: 'normal', sand: true, water: true, fallDmg: true, fuel: 'normal', weather: 'off', tide: 'off' } },
   { name: 'Pure skill', d: 'No wind or weather. The ground stays put.', v: { wind: 'off', gravity: 'normal', sand: false, water: false, fallDmg: false, fuel: 'normal', weather: 'off', tide: 'off' } },
@@ -765,6 +809,7 @@ const LOCALS = [
   { k: 'palette', nm: 'Colours', opts: [['vivid', 'Vivid'], ['natural', 'Natural'], ['neon', 'Neon'], ['pastel', 'Pastel']] },
   { k: 'pixels', nm: 'Pixels', ds: 'Limited uses a small palette per land.', opts: [['limited', 'Limited palette'], ['full', 'Full colour']] },
   { k: 'teamcol', nm: 'Tank colours', opts: [['standard', 'Standard'], ['cb', 'Colour-blind safe']] },
+  { k: 'haptics', nm: 'Vibration', ds: 'A buzz when you fire, get hit or go down, on phones that support it.', opts: [[true, 'On'], [false, 'Off']] },
   { k: 'gfx', nm: 'Graphics', ds: 'Auto turns effects down if needed.', opts: [['auto', 'Auto'], ['high', 'High'], ['low', 'Low']] },
 ];
 function loadLS(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ? { ...d, ...v } : { ...d }; } catch (e) { return { ...d }; } }
@@ -2082,6 +2127,7 @@ function damage(t, amount, by, projId, quiet) {
   }
   t.hp -= amount;
   t.hitAt = tickN;
+  if (!replaying && isMineId(t.id)) buzz(Math.round(clamp(20 + amount, 20, 90)));
   if (!replaying && by != null && by !== t.id && scores[by] && !sameTeam(by, t.id)) scores[by].cash = (scores[by].cash || 0) + amount;
   if (shot && !replaying && by === shot.owner && t.id !== by) shot.dmg += amount;
   if (!quiet || amount > 2) fx.floater(t.x, t.y - 22, '-' + Math.round(amount), amount >= 30 ? '#ff8a6a' : '#f3e2b8', clamp(12 + amount * 0.3, 12, 36));
@@ -2101,6 +2147,7 @@ function recordKill(victimId, killer, x, y, projId) {
   return k;
 }
 function killTank(t, by, projId) {
+  if (!replaying && isMineId(t.id)) buzz([70, 50, 110]);
   t.alive = false; t.hp = 0;
   setOcc(t, 0);
   const k = recordKill(t.id, by, t.x, t.y - 5, projId);
@@ -2215,7 +2262,9 @@ function advance(p) {
   p.age += DT;
   return null;
 }
+function buzz(p) { try { if (prefs.haptics && !replaying && navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
 function fire(t, a, power, wk) {
+  if (!replaying && tanks[cur] === t && isMine(cur)) buzz(14);
   const w = WEAPONS[wk];
   if (t.ammo[wk] > 0) t.ammo[wk]--;
   const sp = speedOf(power), ca = dcos(a), sa = dsin(a);
@@ -2878,6 +2927,7 @@ function applyKit(t, kit) {
 }
 function applyRound(c) {
   if (NET.role === 'day') hideModal(dayModal);
+  fitView();
   if (typeof c.at === 'number') tickN = c.at;
   S = { ...RULE_DEFAULTS, ...c.S };
   mode = ['expedition', 'koth', 'demolition'].includes(c.mode) ? c.mode : 'match';
@@ -4325,8 +4375,25 @@ function viewXf() {
   oy = wh >= ch ? clamp(oy, ch - wh, 0) : (ch - wh) / 2;
   return { s, ox, oy };
 }
+// The camera only moves when you ask it to: pinch, wheel or drag; double-tap or Z for the whole map
+const ucam = { x: W / 2, y: H / 2, z: 1 };
+function fitView() { ucam.x = W / 2; ucam.y = H / 2; ucam.z = 1; }
+function zoomAt(sx, sy, z) {
+  // keep the world point under the screen point (sx, sy in device pixels) where it is
+  const v0 = viewXf(), wx = (sx - v0.ox) / v0.s, wy = (sy - v0.oy) / v0.s;
+  const s0 = Math.min(cw / W, ch / H);
+  ucam.z = clamp(z, 1, 3.2);
+  const s1 = s0 * ucam.z;
+  ucam.x = clamp(wx - (sx - cw / 2) / s1, 0, W); ucam.y = clamp(wy - (sy - ch / 2) / s1, 0, H);
+  cam.x = ucam.x; cam.y = ucam.y; cam.z = ucam.z;
+}
+function panBy(dxCss, dyCss) {
+  const v = viewXf();
+  ucam.x = clamp(cam.x - dxCss * dpr / v.s, 0, W); ucam.y = clamp(cam.y - dyCss * dpr / v.s, 0, H);
+  cam.x = ucam.x; cam.y = ucam.y;
+}
 function updateCamera(rdt) {
-  let tx = W / 2, ty = H / 2, tz = 1;
+  let tx = ucam.x, ty = ucam.y, tz = ucam.z;
   if (phase === 'menu') { const t = performance.now() / 1000; tx = W / 2 + Math.sin(t / 16) * 300; ty = H * 0.5 + Math.sin(t / 11) * 30; tz = 1.55; }
   else if (phase === 'killcam' && kc) {
     const v = kc.kill;
@@ -4639,6 +4706,18 @@ function drawLabels(v, now) {
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(txt, sx + dpr, sy + dpr);
       ctx.fillStyle = 'rgba(236,230,214,.75)'; ctx.fillText(txt, sx, sy);
     }
+  }
+  if (stick && stick.live && dragging) {
+    const r = view.getBoundingClientRect(), sx = (stick.sx - r.left) * dpr, sy = (stick.sy - r.top) * dpr, x = (stick.x - r.left) * dpr, y = (stick.y - r.top) * dpr;
+    const full = Math.min(innerHeight * 0.55, 260) * dpr;
+    ctx.strokeStyle = 'rgba(242,184,75,.35)'; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.arc(sx, sy, full, Math.PI, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = 'rgba(242,184,75,.85)'; ctx.lineWidth = 3 * dpr;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(x, y); ctx.stroke();
+    ctx.fillStyle = '#f2b84b'; ctx.beginPath(); ctx.arc(sx, sy, 5 * dpr, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, 9 * dpr, 0, Math.PI * 2); ctx.fill();
+    const g = myTank();
+    if (g) { ctx.font = `700 ${Math.round(12 * dpr)}px Silkscreen,monospace`; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(`${g.angle}\u00B0 \u00B7 ${g.power}`, x + dpr, y - 16 * dpr + dpr); ctx.fillStyle = '#ffe3a0'; ctx.fillText(`${g.angle}\u00B0 \u00B7 ${g.power}`, x, y - 16 * dpr); }
   }
   // hover a tank for its numbers
   if (hoverPt && !dragging && phase !== 'menu') {
@@ -5856,7 +5935,9 @@ function hudFrame(rdt) {
   }
   const n = Math.round(Math.abs(wind) / 12);
   const wtxt = S.wind === 'off' || n === 0 ? 'Calm' : (wind < 0 ? '\u25C2 ' : '') + n + (wind > 0 ? ' \u25B8' : '');
-  if (hudFrame.w !== wtxt) { hudFrame.w = wtxt; $('windVal').textContent = wtxt; drawWindDial(); }
+  if (hudFrame.w !== wtxt) { hudFrame.w = wtxt; $('windVal').textContent = wtxt; $('windMini').textContent = 'Wind ' + wtxt; drawWindDial(); }
+  const zoomed = ucam.z > 1.02 && phase !== 'menu';
+  if ($('btnFit').hidden === zoomed) $('btnFit').hidden = !zoomed;
   const wx = { clear: '', rain: 'Rain', snow: 'Snow', storm: 'Storm', fog: 'Fog', sandstorm: 'Sandstorm', blizzard: 'Blizzard' }[weatherNow] || '';
   const tide = S.tide !== 'off' && tideY < H ? (abyssOn() ? `The ${abyssKind === 'void' ? 'void' : abyssKind === 'lava' ? 'lava sea' : 'sea'} is rising` : `${S.tide === 'lava' ? 'Lava' : 'Water'} rising`) : '';
   $('wxVal').textContent = [wx, tide].filter(Boolean).join(' \u00B7 '); $('wxVal').hidden = !(wx || tide) || phase === 'menu';
@@ -5892,11 +5973,17 @@ function buildStrip() {
     b.title = `${w.name} \u00B7 ${w.verb}: ${w.d}`;
     b.setAttribute('aria-label', w.name);
     b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[w.k]}</svg><span class="am"></span>`;
-    b.addEventListener('click', () => { const g = myTank(); if (!g || g.ammo[i] === 0) return; g.weapon = i; sfx.turn(); updateHud(); });
+    b.addEventListener('click', () => { const g = myTank(); if (!g || g.ammo[i] === 0) return; g.weapon = i; sfx.turn(); closeWeaponMenu(); updateHud(); });
     box.append(b);
   });
 }
 function syncStrip(g) {
+  const w = WEAPONS[g.weapon];
+  if ($('wpick').dataset.k !== w.k + g.ammo[g.weapon]) {
+    $('wpick').dataset.k = w.k + g.ammo[g.weapon];
+    $('wpickIcon').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" style="color:${w.color}">${ICONS[w.k]}</svg>`;
+    $('wpickName').textContent = w.name; $('wpickAmmo').textContent = g.ammo[g.weapon] < 0 ? '' : '\u00D7' + g.ammo[g.weapon];
+  }
   const btns = $('wbtns').children;
   for (let i = 0; i < btns.length; i++) {
     const am = g.ammo[i], b = btns[i];
@@ -5907,7 +5994,8 @@ function syncStrip(g) {
   const sel = btns[g.weapon];
   if (sel && sel.scrollIntoView && !syncStrip.last !== g.weapon) { const box = $('wbtns'); const l = sel.offsetLeft - box.offsetLeft; if (l < box.scrollLeft || l + sel.offsetWidth > box.scrollLeft + box.clientWidth) box.scrollLeft = l - box.clientWidth / 2 + sel.offsetWidth / 2; }
 }
-function closeWeaponMenu() {}
+function closeWeaponMenu() { hudBottom.classList.remove('tray'); $('wpick').setAttribute('aria-expanded', 'false'); }
+$('wpick').addEventListener('click', () => { const open = !hudBottom.classList.contains('tray'); hudBottom.classList.toggle('tray', open); $('wpick').setAttribute('aria-expanded', String(open)); });
 function cycleWeapon(dir) {
   const g = myTank(); if (!g) return;
   for (let k = 1; k <= WEAPONS.length; k++) { const j = (g.weapon + dir * k + WEAPONS.length * 4) % WEAPONS.length; if (g.ammo[j] !== 0) { g.weapon = j; break; } }
@@ -5916,7 +6004,7 @@ function cycleWeapon(dir) {
 function showModal(m) { m.hidden = false; }
 function hideModal(m) { m.hidden = true; }
 const anyModal = () => !startModal.hidden || !settingsModal.hidden || !roundModal.hidden || !inviteModal.hidden || !$('missionModal').hidden || !$('missionsModal').hidden;
-const isMineId = id => { const t = tankById(id); return !!t && (NET.role === 'client' ? t.ctrl === NET.cid : t.ctrl === 'me'); };
+const isMineId = id => { const t = tankById(id); return !!t && (NET.role === 'client' ? t.ctrl === NET.cid : NET.role === 'day' ? t.ctrl === DAY.uid : t.ctrl === 'me'); };
 let expState = 'next', myKit = {};
 function myId() { const t = NET.role === 'client' ? tanks.find(q => q.ctrl === NET.cid) : tanks.find(q => q.ctrl === 'me'); return t ? t.id : null; }
 function hillText() {
@@ -6137,9 +6225,28 @@ function aimFromPointer(e) {
 }
 let dragging = false;
 const pinch = new Map();
+let gesture = null, panDrag = null, stick = null, aimSnap = null, lastTap = { t: 0, x: 0, y: 0 };
+view.addEventListener('contextmenu', e => e.preventDefault());
 view.addEventListener('pointerdown', e => {
   audioInit();
+  // a first finger down means nothing else is touching: forget any finger we lost track of
+  if (e.isPrimary) { pinch.clear(); gesture = null; }
   if (photo) { pinch.set(e.pointerId, { x: e.clientX, y: e.clientY }); view.setPointerCapture(e.pointerId); return; }
+  pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  view.setPointerCapture(e.pointerId);
+  // a second finger turns any aim into a pinch: put the aim back the way it was
+  if (pinch.size === 2) {
+    if (dragging && aimSnap) { const g = myTank(); if (g) { g.angle = aimSnap.a; g.power = aimSnap.p; } }
+    dragging = false; stick = null; panDrag = null;
+    const [a, b] = [...pinch.values()];
+    gesture = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: ucam.z, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    return;
+  }
+  // double-tap: the whole map
+  const now = e.timeStamp || performance.now();
+  if (e.pointerType !== 'mouse' && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) { fitView(); lastTap.t = 0; return; }
+  lastTap = { t: now, x: e.clientX, y: e.clientY };
+  if (e.button === 2 || e.button === 1) { panDrag = { x: e.clientX, y: e.clientY }; return; }
   if (phase === 'killcam') { endKillcam(); return; }
   closeWeaponMenu();
   if (trySplit()) { updateHud(); return; }
@@ -6149,8 +6256,12 @@ view.addEventListener('pointerdown', e => {
     wormTarget = d > WORM_RANGE ? { x: worm.x + dx / d * WORM_RANGE, y: worm.y + dy / d * WORM_RANGE } : p;
     return;
   }
-  if (!myTank()) return;
-  dragging = true; view.setPointerCapture(e.pointerId); aimFromPointer(e);
+  if (!myTank()) { if (ucam.z > 1.01) panDrag = { x: e.clientX, y: e.clientY }; return; }
+  const g = myTank(); aimSnap = { a: g.angle, p: g.power };
+  dragging = true;
+  // a finger aims like a thumb-stick from wherever it lands; a mouse points at the target
+  if (e.pointerType === 'mouse') aimFromPointer(e);
+  else stick = { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, live: false };
 });
 let hoverPt = null;
 view.addEventListener('pointerleave', () => { hoverPt = null; });
@@ -6168,10 +6279,46 @@ view.addEventListener('pointermove', e => {
     photo.x = clamp(photo.x, 0, W); photo.y = clamp(photo.y, 0, H);
     return;
   }
+  if (gesture && pinch.has(e.pointerId)) {
+    const prev = pinch.get(e.pointerId);
+    pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const [a, b] = [...pinch.values()];
+    if (!b) return;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, d = Math.hypot(a.x - b.x, a.y - b.y);
+    const r = view.getBoundingClientRect();
+    zoomAt((mx - r.left) * dpr, (my - r.top) * dpr, gesture.z0 * d / Math.max(20, gesture.d0));
+    panBy(mx - gesture.mx, my - gesture.my);
+    gesture.mx = mx; gesture.my = my;
+    return;
+  }
+  if (pinch.has(e.pointerId)) pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (panDrag) { panBy(e.clientX - panDrag.x, e.clientY - panDrag.y); panDrag = { x: e.clientX, y: e.clientY }; return; }
+  if (dragging && stick) {
+    stick.x = e.clientX; stick.y = e.clientY;
+    const dx = stick.x - stick.sx, dy = stick.sy - stick.y, len = Math.hypot(dx, dy);
+    if (len < 10 && !stick.live) return;
+    stick.live = true;
+    const g = myTank(); if (!g) return;
+    let a = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (a < 0) a = dx >= 0 ? 0 : 180;
+    const full = Math.min(innerHeight * 0.55, 260);
+    g.angle = clamp(Math.round(a), 0, 180);
+    g.power = clamp(Math.round(len / full * 100), 5, 100);
+    return;
+  }
   if (dragging) aimFromPointer(e);
 });
-view.addEventListener('wheel', e => { if (!photo) return; e.preventDefault(); photo.z = clamp(photo.z * Math.pow(1.0015, -e.deltaY), 1, 6); }, { passive: false });
-const endDrag = e => { dragging = false; if (e) pinch.delete(e.pointerId); };
+view.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (photo) { photo.z = clamp(photo.z * Math.pow(1.0015, -e.deltaY), 1, 6); return; }
+  const r = view.getBoundingClientRect();
+  zoomAt((e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr, ucam.z * Math.pow(1.0015, -e.deltaY));
+}, { passive: false });
+const endDrag = e => {
+  if (e) pinch.delete(e.pointerId);
+  if (pinch.size < 2) gesture = null;
+  if (!pinch.size) { dragging = false; stick = null; panDrag = null; }
+};
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 function holdButton(el, fn, onUp) {
   let iv = null, to = null;
@@ -6410,6 +6557,7 @@ $('mvReset').addEventListener('click', resetDrive);
 function resetDrive() { if (!myTurn() || !preview || isWormSlot(cur)) return; preview.steps.length = 0; moveDir = 0; held.clear && held.clear(); const keep = { angle: preview.ghost.angle, power: preview.ghost.power, weapon: preview.ghost.weapon }; preview.ghost = Object.assign(JSON.parse(JSON.stringify(tanks[cur])), keep); ledgeWarn = null; updateHud(); }
 // fast-forward the other crews' turns (solo only: online, the host sets the pace)
 let ffOn = false, ffHeld = false;
+$('btnFit').addEventListener('click', fitView);
 $('btnFF').addEventListener('click', () => { ffOn = !ffOn; $('btnFF').setAttribute('aria-pressed', String(ffOn)); });
 const ffActive = () => NET.role === 'solo' && (ffOn || ffHeld) && !myTurn() && phase !== 'killcam' && phase !== 'menu' && phase !== 'roundover';
 function exitToMenu() {
@@ -6459,6 +6607,7 @@ window.addEventListener('keydown', e => {
     case 'e': case 'E': cycleWeapon(1); break;
     case 't': case 'T': setThermal(!thermalOn); break;
     case 'r': case 'R': resetDrive(); break;
+    case 'z': case 'Z': fitView(); break;
     case 'f': case 'F': ffHeld = true; break;
     case 'p': case 'P': enterPhoto(); break;
     case ' ': case 'Enter':
@@ -6524,7 +6673,7 @@ window.__shellfall = {
   get phase() { return phase; }, get tanks() { return tanks; }, get worm() { return worm; }, get cur() { return cur; }, get projs() { return projs; },
   get tickN() { return tickN; }, get kc() { return kc; }, get ts() { return ts; }, get turnNo() { return turnNo; }, get net() { return NET; },
   get weatherNow() { return weatherNow; }, get preview() { return preview; }, get S() { return S; }, get round() { return round; }, get shot() { return shot; },
-  rules, prefs, grid, W, H, M: { AIR, DIRT, ROCK, SAND, WATER, BED, RUBBLE, LAVA, OBS, OIL, FIRE, ACID, ICE, GAS, POWDER, STEAM, SNOW, METAL, BRUSH, GEM, WOOD }, get landmark() { return landmark; }, get abyssKind() { return abyssKind; }, get moonX() { return moonX; }, get camZ() { return cam.z; }, get ledgeWarn() { return ledgeWarn; }, ghostRaw() { const g = preview.ghost, o = {}; for (const k of Object.keys(g)) { const v = g[k]; if (typeof v === "number" && (isNaN(v) || Object.is(v, -0) || !Number.isInteger(v))) o[k] = String(v); else if (v === undefined) o[k] = "undef"; } return o; }, probeStep(dir) { const g = preview.ghost, p = JSON.parse(JSON.stringify(g)), y0 = p.y; const ok = driveStep(p, cur, dir, true); return { ok, x: p.x, y: p.y, dy: p.y - y0, alive: p.alive, fuel: g.fuel, locked: g.locked, air: g.air }; }, drive(dir, n) { moveDir = dir; const log = []; for (let i = 0; i < n; i++) { driveFrame(0.05); log.push(preview.ghost.x + ":" + preview.ghost.y); } moveDir = 0; return log; }, lastShotOf(k) { return lastShot[tanks[k].id]; }, camReset() { camFocus = null; cam.x = W / 2; cam.y = H / 2; cam.z = 1; }, get TH() { return TH; }, get abyssY() { return abyssY; },
+  rules, prefs, grid, W, H, M: { AIR, DIRT, ROCK, SAND, WATER, BED, RUBBLE, LAVA, OBS, OIL, FIRE, ACID, ICE, GAS, POWDER, STEAM, SNOW, METAL, BRUSH, GEM, WOOD }, get landmark() { return landmark; }, get abyssKind() { return abyssKind; }, get moonX() { return moonX; }, get camZ() { return cam.z; }, get ucamZ() { return ucam.z; }, get lastTap() { return lastTap; }, get ledgeWarn() { return ledgeWarn; }, ghostRaw() { const g = preview.ghost, o = {}; for (const k of Object.keys(g)) { const v = g[k]; if (typeof v === "number" && (isNaN(v) || Object.is(v, -0) || !Number.isInteger(v))) o[k] = String(v); else if (v === undefined) o[k] = "undef"; } return o; }, probeStep(dir) { const g = preview.ghost, p = JSON.parse(JSON.stringify(g)), y0 = p.y; const ok = driveStep(p, cur, dir, true); return { ok, x: p.x, y: p.y, dy: p.y - y0, alive: p.alive, fuel: g.fuel, locked: g.locked, air: g.air }; }, drive(dir, n) { moveDir = dir; const log = []; for (let i = 0; i < n; i++) { driveFrame(0.05); log.push(preview.ghost.x + ":" + preview.ghost.y); } moveDir = 0; return log; }, lastShotOf(k) { return lastShot[tanks[k].id]; }, camReset() { camFocus = null; cam.x = W / 2; cam.y = H / 2; cam.z = 1; }, get TH() { return TH; }, get abyssY() { return abyssY; },
   planBot, submitCmd, fireMine, trySplit, myTank, WEAPONS, WI, isSubmerged, surfaceY,
   hash() {
     let h = 2166136261;
