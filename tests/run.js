@@ -2,6 +2,7 @@
 //   node tests/run.js           everything (slow: 20-40 minutes with software WebGL)
 //   node tests/run.js quick     the core checks (about 6 minutes)
 //   node tests/run.js day-game  one or more tests by name
+//   node tests/run.js firebase  self-hosted online play (start the emulators first: npm run emulators)
 // Each test prints what it measured; a run fails on page errors, sync mismatches or a crash.
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -14,11 +15,14 @@ const TESTS = [
   ['day-game', 'Day games: lobby, join, alternating turns, leave and come back later (mock db)', true],
   ['day-rounds', 'Day games: round over and the next round started by another player', false],
   ['day-manager', 'Day game manager: leave (bot takes over), end, hide, delete', true],
+  ['firebase', 'Self-hosted online play on Firebase: live game, day game, manager and rules (needs npm run emulators)', false],
   ['touch', 'Phones in landscape: thumb-zone layout, thumb-stick aim, pinch zoom, weapon tray, double-tap', true],
+  ['split-tap', 'Phones: field taps never split a shell, Split button does; full screen; app manifest', true],
   ['menu-flow', 'Title screen disclosure, pause, exit to menu and play again', true],
   ['drive', 'Tanks can drive both ways on many maps', true],
   ['ledge', 'Ledge warning stops once, the next push goes over', false],
   ['idle-tanks', 'Parked tanks never move or shake', false],
+  ['debris', 'Shells pass through lone falling grains but burst on clumps', true],
   ['barrel-clearance', 'Shells never burst against something touching the barrel', false],
   ['abyss', 'Falling into the deadly floor kills and credits the shooter; gems pay', false],
   ['bots-abyss', 'Bots never drive into the abyss on their own', false],
@@ -32,7 +36,8 @@ const TESTS = [
 ];
 
 const args = process.argv.slice(2);
-const pick = args.length === 0 ? TESTS : args[0] === 'quick' ? TESTS.filter(t => t[2]) : TESTS.filter(t => args.includes(t[0]));
+// the Firebase test needs the emulators running, so it only runs when named
+const pick = args.length === 0 ? TESTS.filter(t => t[0] !== 'firebase') : args[0] === 'quick' ? TESTS.filter(t => t[2]) : TESTS.filter(t => args.includes(t[0]));
 const out = path.join(__dirname, 'output');
 fs.mkdirSync(out, { recursive: true });
 

@@ -1,6 +1,14 @@
 <title>Shellfall</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1216">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shellfall">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800;900&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Silkscreen:wght@400;700&family=Special+Elite&display=swap">
@@ -587,7 +595,7 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
           <span class="bigcode" id="invCode">0000</span>
           <span class="linkline" id="invLink"></span>
           <div class="row"><button class="btn" id="btnCopyLink">Copy link</button></div>
-          <p class="note">Friends scan the code or open the link, then tap Join. They need to be signed in to Claude and have access to this page (Share menu).</p>
+          <p class="note" id="invNote">Friends scan the code or open the link, then tap Join. They need to be signed in to Claude and have access to this page (Share menu).</p>
         </div>
       </div>
       <h3>Players</h3>
@@ -599,7 +607,253 @@ table.scores td.num,table.scores th.num{text-align:right;font-family:var(--f-mon
 <script>
 (() => {
 'use strict';
-const PAGE_URL = 'https://claude.ai/artifact/YHKEHbi2JzuZCSgRuPaeop';
+const CLAUDE_URL = 'https://claude.ai/artifact/YHKEHbi2JzuZCSgRuPaeop';
+
+// =====================================================================
+// HOSTING YOUR OWN COPY: online play through Firebase.
+// On claude.ai the page uses the Artifact platform for online play and this is ignored.
+// Anywhere else (GitHub Pages, Firebase Hosting, ...) paste your Firebase web config here
+// (Firebase console > Project settings > Your apps > Web app > SDK setup and configuration > Config),
+// for example:
+//   const FIREBASE_CONFIG = { apiKey: '...', authDomain: 'shellfall-xxxx.firebaseapp.com',
+//     databaseURL: 'https://shellfall-xxxx-default-rtdb.firebaseio.com', projectId: 'shellfall-xxxx', appId: '...' };
+// It must include databaseURL. These values are not secret; database.rules.json protects the data.
+// Leave it null and the page plays solo only (outside claude.ai).
+// =====================================================================
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyB-PNQQfMK_3B5xPJUaMMplDWkLbK8DUgs',
+  authDomain: 'shellfall-2a422.firebaseapp.com',
+  databaseURL: 'https://shellfall-2a422-default-rtdb.firebaseio.com',
+  projectId: 'shellfall-2a422',
+  storageBucket: 'shellfall-2a422.firebasestorage.app',
+  messagingSenderId: '358107564887',
+  appId: '1:358107564887:web:1529c24500a1b9a2a78c12'
+};
+
+const hasClaude = () => !!(window.claude && typeof window.claude.use === 'function');
+const fbConfig = () => (window.__sfFirebase && window.__sfFirebase.config) || FIREBASE_CONFIG;
+// the link friends open: the claude.ai page, or this page when self-hosted
+const pageUrl = () => (!hasClaude() && fbConfig()) ? location.origin + location.pathname : CLAUDE_URL;
+// online capabilities: the claude.ai platform when present, else Firebase when configured, else none
+function capUse(name) {
+  if (hasClaude()) return window.claude.use(name);
+  if (fbConfig() && (name === 'room' || name === 'db' || name === 'user')) return FB.use(name);
+  return Promise.resolve(null);
+}
+function onlineHelp() {
+  if (hasClaude()) return 'Online play works when this page is open on claude.ai and you are signed in.';
+  if (fbConfig()) return 'Could not reach the game server. Check your connection and try again.';
+  return 'Online play needs this page on claude.ai, or your own copy with Firebase set up (see the README).';
+}
+
+// Firebase Realtime Database behind the same room / db / user interface the claude.ai platform offers.
+// Layout: rooms/{room}/{uid_tab} presence; cards/{code} game cards; moves|state|kits|lock/{code}/{id};
+// mine/{uid}/{code} an index of each player's games. Documents are stored as JSON text in "j"
+// (so arrays, empty lists and any key survive), plus the few fields the rules and queries need.
+const FB = {
+  SDK: 'https://cdn.jsdelivr.net/npm/firebase@13.1.0/',
+  p: null, db: null, uid: null, skew: 0, tab: Math.random().toString(36).slice(2, 8),
+  load(src) {
+    return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(el); });
+  },
+  init() {
+    if (this.p) return this.p;
+    this.p = (async () => {
+      if (!window.firebase || !window.firebase.database) {
+        if (!window.firebase) await this.load(this.SDK + 'firebase-app-compat.js');
+        await Promise.all([this.load(this.SDK + 'firebase-auth-compat.js'), this.load(this.SDK + 'firebase-database-compat.js')]);
+      }
+      const fb = window.firebase;
+      const app = fb.apps.find(a => a.name === 'shellfall') || fb.initializeApp(fbConfig(), 'shellfall');
+      const auth = app.auth(), db = app.database();
+      const emu = window.__sfFirebase && window.__sfFirebase.emulator;
+      if (emu && !this.emuSet) { this.emuSet = true; auth.useEmulator(emu.auth); db.useEmulator(emu.host, emu.port); }
+      let u = await new Promise(r => { const off = auth.onAuthStateChanged(x => { off(); r(x); }); });
+      if (!u) u = (await auth.signInAnonymously()).user;
+      this.uid = u.uid; this.db = db;
+      db.ref('.info/serverTimeOffset').on('value', sn => { this.skew = sn.val() || 0; });
+      return true;
+    })().catch(e => { console.warn('firebase', e); this.p = null; return false; });
+    return this.p;
+  },
+  async use(name) {
+    if (!(await this.init())) return null;
+    if (name === 'user') { const id = this.uid; return { id: async () => id, me: async () => ({ id }) }; }
+    if (name === 'room') return this.roomApi();
+    if (name === 'db') return this.dbApi();
+    return null;
+  },
+  now() { return Date.now() + this.skew; },
+  // ---- room: presence per tab, removed when the tab goes away ----
+  roomApi() {
+    const db = this.db, uid = this.uid, me = uid + '_' + this.tab;
+    return {
+      connected: () => true,
+      join: async name => {
+        const ref = db.ref('rooms/' + String(name).replace(/[.#$\[\]\/]/g, '_')), mine = ref.child(me);
+        let pres = {}, sent = '', timer = null, snap = Object.freeze([]), live = true;
+        const others = new Map(), ls = new Set();
+        const rebuild = () => {
+          const arr = [Object.freeze({ peer: me, isMe: true, sameTab: true, kind: 'player', guest: false, presence: Object.freeze({ ...pres }), updatedAt: Date.now() })];
+          for (const [k, v] of others) arr.push(Object.freeze({ peer: k, isMe: k.startsWith(uid + '_'), sameTab: false, kind: 'player', guest: false, presence: v, updatedAt: Date.now() }));
+          snap = Object.freeze(arr);
+          for (const f of ls) setTimeout(() => { if (live) f({ peers: snap, joined: [], left: [], updated: [] }); }, 0);
+        };
+        const read = sn => { try { return Object.freeze(JSON.parse(sn.val().j)); } catch (e) { return Object.freeze({}); } };
+        const onSet = sn => { if (sn.key !== me) { others.set(sn.key, read(sn)); rebuild(); } };
+        const onDel = sn => { if (others.delete(sn.key)) rebuild(); };
+        ref.on('child_added', onSet); ref.on('child_changed', onSet); ref.on('child_removed', onDel);
+        await mine.onDisconnect().remove();
+        // writes are coalesced (one per 33 ms) and skipped when nothing changed
+        const flush = () => {
+          timer = null;
+          const j = JSON.stringify(pres);
+          if (j === sent || !live) return;
+          sent = j;
+          mine.set({ j, t: window.firebase.database.ServerValue.TIMESTAMP }).catch(e => console.warn('presence', e));
+        };
+        return {
+          name,
+          presence: async patch => {
+            for (const k of Object.keys(patch || {})) { if (patch[k] === null || patch[k] === undefined) delete pres[k]; else pres[k] = patch[k]; }
+            if (!timer) timer = setTimeout(flush, 33);
+            rebuild();
+          },
+          peers: () => snap,
+          onPeers: f => { ls.add(f); setTimeout(() => { if (live && ls.has(f)) f({ peers: snap, joined: snap, left: [], updated: [] }); }, 0); return () => ls.delete(f); },
+          connected: () => true,
+          onConnection: f => { setTimeout(() => f(true), 0); return () => {}; },
+          emit: async () => {}, on: () => () => {},
+          leave: async () => {
+            live = false; ls.clear(); clearTimeout(timer);
+            ref.off('child_added', onSet); ref.off('child_changed', onSet); ref.off('child_removed', onDel);
+            try { await mine.onDisconnect().cancel(); await mine.remove(); } catch (e) {}
+          },
+        };
+      },
+    };
+  },
+  // ---- db: documents and collections ----
+  // "games" -> cards, "games/C" -> cards/C, "games/C/sub" -> sub/C, "games/C/sub/id" -> sub/C/id
+  path(p) {
+    const a = String(p).split('/').filter(Boolean);
+    if (a[0] === 'games' && a.length <= 2) return ['cards'].concat(a.slice(1)).join('/');
+    if (a[0] === 'games' && a.length <= 4) return [a[2], a[1]].concat(a.slice(3)).join('/');
+    return 'misc/' + a.join('/');
+  },
+  enc(p, d) {
+    const o = { j: JSON.stringify(d) };
+    if (typeof d.s === 'number') o.s = d.s;
+    if (typeof d.by === 'string') o.by = d.by;
+    if (Array.isArray(d.uids)) { o.p = {}; for (const u of d.uids) if (typeof u === 'string' && u) o.p[u] = true; }
+    return o;
+  },
+  dec(v) {
+    if (v === null || v === undefined) return undefined;
+    if (typeof v.j === 'string') { try { return JSON.parse(v.j); } catch (e) { return undefined; } }
+    return v;
+  },
+  snapOf(id, v) { const d = this.dec(v); return { id, exists: d !== undefined, data: () => d, metadata: { fromCache: false, hasPendingWrites: false } }; },
+  async index(p, d) {
+    // keep mine/{uid}/{code} pointing at every card a player is in (a superset; stale ones are filtered on read)
+    const a = String(p).split('/').filter(Boolean);
+    if (a[0] !== 'games' || a.length !== 2 || !Array.isArray(d.uids)) return;
+    const up = {};
+    for (const u of d.uids) if (typeof u === 'string' && u) up['mine/' + u + '/' + a[1]] = true;
+    try { await this.db.ref().update(up); } catch (e) {}
+  },
+  dbApi() {
+    const F = this, db = this.db;
+    const docRef = path => {
+      const ref = db.ref(F.path(path)), id = String(path).split('/').pop();
+      return {
+        id, path,
+        async get() { const sn = await ref.once('value'); return F.snapOf(id, sn.val()); },
+        async set(d) { d = JSON.parse(JSON.stringify(d)); await ref.set(F.enc(path, d)); await F.index(path, d); },
+        async update(d) {
+          d = JSON.parse(JSON.stringify(d));
+          let found = false;
+          const r = await ref.transaction(cur => {
+            if (cur === null) { found = false; return null; }
+            const o = F.dec(cur) || {};
+            Object.assign(o, d); found = true;
+            return F.enc(path, o);
+          });
+          if (!r.committed || !found || !r.snapshot.exists()) throw Object.assign(new Error('No such document: ' + path), { code: 'not_found' });
+          if ('uids' in d) await F.index(path, F.dec(r.snapshot.val()));
+        },
+        async delete() { await ref.remove(); },
+        async acquire(opts) {
+          const holder = String((opts && opts.holder) || F.uid), ttl = (opts && opts.ttlMs) || 30000;
+          let exp = 0;
+          const r = await ref.transaction(cur => {
+            const now = F.now();
+            if (cur && cur.exp > now && cur.h !== holder) return;
+            exp = now + ttl;
+            return { h: holder, exp };
+          }, undefined, false);
+          if (!r.committed) { const v = r.snapshot.val(); return { acquired: false, expiresAt: v && v.exp ? new Date(v.exp).toISOString() : null }; }
+          return { acquired: true, version: 1, holder, expiresAt: new Date(exp).toISOString() };
+        },
+        onSnapshot(next, err) {
+          const cb = sn => next(F.snapOf(id, sn.val()));
+          ref.on('value', cb, e => { if (err) err(e); });
+          return () => ref.off('value', cb);
+        },
+        collection(sub) { return collRef(path + '/' + sub); },
+      };
+    };
+    const collRef = (path, filters = [], order = null, lim = 0) => {
+      const node = db.ref(F.path(path));
+      const pass = d => d !== undefined && filters.every(([f, op, v]) =>
+        op === '>' ? d[f] > v : op === '>=' ? d[f] >= v : op === '<' ? d[f] < v : op === '<=' ? d[f] <= v : op === '==' ? d[f] === v
+          : op === 'array-contains' ? Array.isArray(d[f]) && d[f].includes(v) : true);
+      const result = list => {
+        let docs = list.filter(x => pass(x.data()));
+        if (order) docs.sort((a, b) => { const x = a.data()[order[0]], y = b.data()[order[0]]; return (x > y ? 1 : x < y ? -1 : 0) * (order[1] === 'desc' ? -1 : 1); });
+        else docs.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+        if (lim) docs = docs.slice(0, lim);
+        return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } };
+      };
+      const fromSnap = sn => { const out = []; sn.forEach(c => { out.push(F.snapOf(c.key, c.val())); }); return result(out); };
+      // a range on "s" is answered by the server (indexed); everything else is filtered here
+      const query = () => {
+        const g = filters.find(([f, op]) => f === 's' && (op === '>' || op === '>='));
+        return g ? node.orderByChild('s').startAt(g[2]) : node;
+      };
+      return {
+        path,
+        doc(id) { return docRef(path + '/' + (id || node.push().key)); },
+        async add(d) { const r = this.doc(); await r.set(d); return r; },
+        where(f, op, v) { return collRef(path, filters.concat([[f, op, v]]), order, lim); },
+        orderBy(f, dir) { return collRef(path, filters, [f, dir], lim); },
+        limit(n) { return collRef(path, filters, order, n); },
+        async get() {
+          const ac = filters.find(([f, op]) => f === 'uids' && op === 'array-contains');
+          if (ac && F.path(path) === 'cards') {
+            // "games I am in": read my index, then each card
+            const ix = (await db.ref('mine/' + ac[2]).once('value')).val() || {};
+            const out = await Promise.all(Object.keys(ix).map(async code => {
+              try {
+                const sn = F.snapOf(code, (await db.ref('cards/' + code).once('value')).val());
+                if (!pass(sn.data()) && ac[2] === F.uid) db.ref('mine/' + F.uid + '/' + code).remove().catch(() => {});
+                return sn;
+              } catch (e) { return null; }
+            }));
+            return result(out.filter(Boolean));
+          }
+          return fromSnap(await query().once('value'));
+        },
+        onSnapshot(next, err) {
+          const q = query(), cb = sn => next(fromSnap(sn));
+          q.on('value', cb, e => { if (err) err(e); });
+          return () => q.off('value', cb);
+        },
+      };
+    };
+    return { doc: docRef, collection: p => collRef(p) };
+  },
+};
 
 // =====================================================================
 // Deterministic maths. Everything that changes the world uses only
@@ -773,7 +1027,7 @@ const CURATED = [
   { k: 'lantern', name: 'Lantern Point', theme: 'ruins', seed: 1201 }, { k: 'breakwater', name: 'The Breakwater', theme: 'ruins', seed: 5113 },
 ];
 const RULE_DEFAULTS = { wind: 'changing', gravity: 'normal', sand: true, water: true, fallDmg: true, fuel: 'normal', weather: 'changing', tide: 'off', keep: false, worm: 'off', bots: 3, skill: 'mixed', teams: 'off', theme: 'random', mode: 'match', time: 'cycle', director: true, abyss: 'auto', map: 'random' };
-const LOCAL_DEFAULTS = { haptics: true, aim: 'short', killcam: true, slowmo: true, sound: true, music: true, gfx: 'auto', palette: 'vivid', teamcol: 'standard', pixels: 'limited' };
+const LOCAL_DEFAULTS = { fullscreen: true, haptics: true, aim: 'short', killcam: true, slowmo: true, sound: true, music: true, gfx: 'auto', palette: 'vivid', teamcol: 'standard', pixels: 'limited' };
 const PRESETS = [
   { name: 'Classic', d: 'Wind each turn, crumbling ground, clear skies. Scorched Earth feel.', v: { wind: 'changing', gravity: 'normal', sand: true, water: true, fallDmg: true, fuel: 'normal', weather: 'off', tide: 'off' } },
   { name: 'Pure skill', d: 'No wind or weather. The ground stays put.', v: { wind: 'off', gravity: 'normal', sand: false, water: false, fallDmg: false, fuel: 'normal', weather: 'off', tide: 'off' } },
@@ -809,6 +1063,7 @@ const LOCALS = [
   { k: 'palette', nm: 'Colours', opts: [['vivid', 'Vivid'], ['natural', 'Natural'], ['neon', 'Neon'], ['pastel', 'Pastel']] },
   { k: 'pixels', nm: 'Pixels', ds: 'Limited uses a small palette per land.', opts: [['limited', 'Limited palette'], ['full', 'Full colour']] },
   { k: 'teamcol', nm: 'Tank colours', opts: [['standard', 'Standard'], ['cb', 'Colour-blind safe']] },
+  { k: 'fullscreen', nm: 'Full screen on phones', ds: 'Hides the browser bars when you tap a button. On iPhone, use Share, Add to Home Screen instead.', opts: [[true, 'On'], [false, 'Off']] },
   { k: 'haptics', nm: 'Vibration', ds: 'A buzz when you fire, get hit or go down, on phones that support it.', opts: [[true, 'On'], [false, 'Off']] },
   { k: 'gfx', nm: 'Graphics', ds: 'Auto turns effects down if needed.', opts: [['auto', 'Auto'], ['high', 'High'], ['low', 'Low']] },
 ];
@@ -2231,6 +2486,17 @@ function tankAt(px, py, owner, age) {
   return null;
 }
 // One tick of flight, without touching the world. Used for live shells, the aim line and the bots.
+function looseGrain(x, y) {
+  if (y + 1 < H && SOLID[grid[(y + 1) * W + x]]) return false;
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dy) continue;
+    const xx = x + dx, yy = y + dy;
+    if (xx < 0 || xx >= W || yy < 0 || yy >= H) continue;
+    if (SOLID[grid[yy * W + xx]] && ++n > 2) return false;
+  }
+  return true;
+}
 function advance(p) {
   p.vx += windAt(p.x, p.y) * DT;
   p.vy += G() * DT;
@@ -2249,6 +2515,9 @@ function advance(p) {
     if (p.y < 0) continue;
     const xi = p.x | 0, yi = p.y | 0, g = grid[yi * W + xi];
     if (SOLID[g]) {
+      // a lone grain of sand, rubble or snow tumbling through the air is debris, not ground:
+      // the shell knocks it aside instead of bursting on something you can barely see
+      if (FALLS[g] && looseGrain(xi, yi)) { if (p.live) setCell(yi * W + xi, AIR); continue; }
       if (p.age < 0.25 && g !== BED && p.owner != null && p.owner !== WORM_ID) {
         const o = p.from || tankById(p.owner);
         if (o && Math.abs(p.x - o.x) < 20 && p.y > o.y - 30 && p.y < o.y + 2) { if (p.live) setCell(yi * W + xi, AIR); continue; }
@@ -2262,6 +2531,21 @@ function advance(p) {
   p.age += DT;
   return null;
 }
+// Phones: go full screen (and hold landscape where the browser allows) on the next button tap.
+// Browsers only allow this from a tap, so it can't happen on page load.
+function goFull() {
+  try {
+    if (!prefs.fullscreen || document.fullscreenElement || document.webkitFullscreenElement) return;
+    if (!(window.matchMedia && matchMedia('(pointer:coarse)').matches)) return;
+    if (window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) return;
+    const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!rq) return;
+    const r = rq.call(el, { navigationUI: 'hide' });
+    const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) {} };
+    if (r && r.then) r.then(lock, () => {}); else lock();
+  } catch (e) {}
+}
+document.addEventListener('click', e => { if (e.target && e.target.closest && e.target.closest('button')) goFull(); }, true);
 function buzz(p) { try { if (prefs.haptics && !replaying && navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
 function fire(t, a, power, wk) {
   if (!replaying && tanks[cur] === t && isMine(cur)) buzz(14);
@@ -3700,7 +3984,8 @@ let windingUp = false;
 function trySplit() {
   if (!shot || shot.splitTick || shot.splitAsked || replaying) return false;
   if (phase !== 'flight' || !isMine(cur) || isWormSlot(cur)) return false;
-  if (!projs.some(p => p.primary && p.mode === 'fly')) return false;
+  // not in the first moments of flight, so a double-tapped Fire button doesn't split the shell at the barrel
+  if (!projs.some(p => p.primary && p.mode === 'fly' && p.age >= 0.35)) return false;
   shot.splitAsked = true;
   if (NET.role === 'client') NET.requestSplit(turnNo, Math.max(tickN, NET.hostTick) + 30);
   else if (NET.role === 'day') { shot.splitTick = tickN + 2; if (DAY.pending) DAY.pending.splitTick = shot.splitTick; }
@@ -3774,11 +4059,11 @@ const NET = {
     this.game = null; this.xfer = null; this.room = null; this.role = 'solo'; this.pending = null; this.cmds = []; this.seats = {}; this.syncing = false; this.code = '';
   },
   async getRoom() {
-    try { if (!window.claude || typeof window.claude.use !== 'function') return null; return await window.claude.use('room'); } catch (e) { return null; }
+    try { return await capUse('room'); } catch (e) { return null; }
   },
   async host() {
     const room = await this.getRoom();
-    if (!room) { showNetErr('Online play works when this page is open on claude.ai and you are signed in.'); return false; }
+    if (!room) { showNetErr(onlineHelp()); return false; }
     this.room = room;
     this.cid = myCid();
     this.name = ($('joinName').value || '').trim().slice(0, 16) || 'Host';
@@ -3873,7 +4158,7 @@ const NET = {
   },
   async join(code, name, want) {
     const room = await this.getRoom();
-    if (!room) { showNetErr('Online play works when this page is open on claude.ai and you are signed in.'); return false; }
+    if (!room) { showNetErr(onlineHelp()); return false; }
     this.room = room; this.code = code; this.cid = myCid(); this.name = name; this.want = want;
     try { this.game = await room.join('sf-' + code); }
     catch (e) { showNetErr('Could not reach that game. Check the code and try again.'); return false; }
@@ -4010,11 +4295,10 @@ const DAY = {
   pending: null, writing: false, ckptSeq: 0, botBusy: false, roundBusy: false, kits: {}, loaded: false, tab: Math.random().toString(36).slice(2, 8),
   async ready() {
     if (this.db) return true;
-    if (this.tried && !this.db) return false;
+    if (this.tried && !this.db && hasClaude()) return false;
     this.tried = true;
     try {
-      if (!window.claude || typeof window.claude.use !== 'function') return false;
-      const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+      const [db, user] = await Promise.all([capUse('db'), capUse('user')]);
       if (!db || !user) return false;
       const uid = await user.id();
       if (!uid) return false;
@@ -4045,7 +4329,7 @@ const DAY = {
     return null;
   },
   async join(code, name) {
-    if (!(await this.ready())) return 'Day games need you signed in to Claude.';
+    if (!(await this.ready())) return hasClaude() ? 'Day games need you signed in to Claude.' : onlineHelp();
     const ref = this.gameRef(code), snap = await ref.get();
     if (!snap.exists) return 'No day game with that code.';
     const d = snap.data();
@@ -5072,6 +5356,11 @@ function takePhoto() {
   c.toBlob(async blob => {
     if (!blob) return;
     const dl = await (window.claude && window.claude.use ? window.claude.use('downloads').catch(() => null) : null);
+    if (!dl && !hasClaude()) {
+      try { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `shellfall-${Date.now()}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); flashNotice('Photo saved.', 2.5); }
+      catch (e) { flashNotice('The photo could not be saved here.', 3); }
+      return;
+    }
     if (!dl) { flashNotice('Saving photos works when this page is open on claude.ai.', 4); return; }
     try { await dl.save({ filename: `shellfall-${Date.now()}.png`, data: blob }); flashNotice('Photo saved.', 2.5); }
     catch (e) { if (e && e.code !== 'declined') flashNotice('The photo could not be saved here.', 3); }
@@ -6173,7 +6462,8 @@ function closeSettings() { hideModal(settingsModal); paused = NET.role === 'solo
 function openInvite() {
   if (NET.role === 'solo') return;
   $('invCode').textContent = NET.code;
-  const link = `${PAGE_URL}#join-${NET.code}`;
+  if (!hasClaude()) $('invNote').textContent = 'Friends scan the code or open the link, then tap Join.';
+  const link = `${pageUrl()}#join-${NET.code}`;
   $('invLink').textContent = link;
   const box = $('qrBox'); box.textContent = '';
   try {
@@ -6249,7 +6539,10 @@ view.addEventListener('pointerdown', e => {
   if (e.button === 2 || e.button === 1) { panDrag = { x: e.clientX, y: e.clientY }; return; }
   if (phase === 'killcam') { endKillcam(); return; }
   closeWeaponMenu();
-  if (trySplit()) { updateHud(); return; }
+  // a mouse click splits a shell in flight; on phones a tap on the field never does (people touch the
+  // screen to look around while a shell flies). Phones split with the Split button.
+  if (e.pointerType === 'mouse' && trySplit()) { updateHud(); return; }
+  if (phase === 'flight' && e.pointerType !== 'mouse' && shot && isMine(cur)) { if (ucam.z > 1.01) panDrag = { x: e.clientX, y: e.clientY }; return; }
   if (myTurn() && isWormSlot(cur)) {
     const p = worldFromEvent(e);
     const dx = p.x - worm.x, dy = p.y - worm.y, d = Math.sqrt(dx * dx + dy * dy);
@@ -6417,7 +6710,7 @@ function withDayRules(fn) {
   try { return fn(); } finally { for (const k of Object.keys(rules)) delete rules[k]; Object.assign(rules, saved); }
 }
 const dayModal = $('dayModal');
-function dayLink(code) { return `${PAGE_URL}#day-${code}`; }
+function dayLink(code) { return `${pageUrl()}#day-${code}`; }
 let dayCard = null;
 const ago = t => { if (!t) return ''; const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 function updateDayUi() {
@@ -6506,7 +6799,7 @@ async function openDayGame(code) {
   audioInit(); showNetErr('');
   NET.leave();
   const ok = await DAY.open(code);
-  if (!ok) { showNetErr('Day games need this page open on claude.ai, signed in.'); NET.role = 'solo'; return; }
+  if (!ok) { showNetErr(hasClaude() ? 'Day games need this page open on claude.ai, signed in.' : onlineHelp()); NET.role = 'solo'; return; }
   hideModal(startModal); paused = false;
   // wait briefly for the game card, then show the lobby or drop straight into play
   for (let i = 0; i < 40 && !DAY.meta; i++) await new Promise(r => setTimeout(r, 100));
@@ -6521,7 +6814,7 @@ $('btnDayNew').addEventListener('click', async () => {
   $('btnDayNew').disabled = true;
   const code = await DAY.create(name);
   $('btnDayNew').disabled = false;
-  if (!code) { showNetErr('Day games need this page open on claude.ai, signed in.'); return; }
+  if (!code) { showNetErr(hasClaude() ? 'Day games need this page open on claude.ai, signed in.' : onlineHelp()); return; }
   openDayGame(code);
 });
 $('btnDayClose').addEventListener('click', () => {

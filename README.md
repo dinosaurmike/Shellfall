@@ -1,122 +1,194 @@
 # Shellfall
 
-Pixel artillery on a world you can blow apart, flood, freeze and set on fire, one grain at a time.
+![Shellfall: pixel artillery on a world that breaks one grain at a time](docs/images/shellfall-header.gif)
 
-Turn-based tank artillery in the spirit of the classics, built on a falling-sand world:
-every pixel is a grain of dirt, rock, sand, water, lava, oil, gas, ice or metal, and
-everything reacts. One tank type; the variety is in the shells and the chemistry.
+[![Play Shellfall](https://img.shields.io/badge/play-shellfall--2a422.web.app-e3a83c)](https://shellfall-2a422.web.app)
+![One file, no build step](https://img.shields.io/badge/one_file-~400_KB-2d3127)
+![No build step](https://img.shields.io/badge/build_step-none-2d3127)
 
-The whole game is one self-contained file, `index.html` (about 370 KB, plain JavaScript,
-no build step). It was written to run as a claude.ai Artifact, but it plays solo in any
-modern browser.
+**Pixel artillery on a world you can blow apart, flood, freeze and set on fire, one grain at a time.**
 
-## Play it
+Shellfall is turn-based tank artillery in the spirit of the classics, built on a falling-sand
+world. Every pixel is a grain of dirt, rock, sand, water, lava, oil, gas, ice or metal, and
+everything reacts: lava meets water and turns to obsidian, acid eats straight down, a gas cloud
+drifts until a spark finds it. There's one tank type; the variety is in the shells and the
+chemistry.
+
+Play solo against a cast of bot crews with grudges, run the missions, dig down an expedition to a
+boss, or play friends live or over a day, a turn whenever you have a minute.
+
+### [▶ Play now](https://shellfall-2a422.web.app)
+
+On a phone, turn it sideways. No install, no account.
+
+## How it works
+
+```mermaid
+flowchart LR
+  page["<b>index.html</b><br/>60 Hz deterministic sim<br/>falling sand · chemistry<br/>WebGL2 renderer · bots"]
+  rtdb["<b>Firebase Realtime Database</b><br/>live rooms · day games<br/>(moves, checkpoints, leases)"]
+  auth["<b>Firebase Auth</b><br/>anonymous sign-in"]
+  page <-- "commands only:<br/>turn · split · round" --> rtdb
+  page -- "a player id,<br/>no account" --> auth
+```
+
+- **The whole game is one file.** `index.html` is about 400 KB of plain JavaScript, HTML and CSS
+  with no build step and no framework. The only outside code is fetched from CDNs: fonts, a QR code
+  generator for invites, and the Firebase SDK once you go online.
+- **The world is deterministic.** Everything that changes the world runs in a fixed 60 Hz tick
+  using a seeded random number generator and only `+ - * / sqrt floor`. Even sine and cosine are
+  computed in code instead of `Math.sin`, so every browser gets bit-identical results. Same
+  inputs, same world, on every machine.
+- **So online play only sends commands.** A turn is a handful of numbers: drive steps, angle,
+  power, shell. Every player's copy replays them and ends up in exactly the same world, craters
+  and all. There's no server-side game logic at all.
+- **Two kinds of online play.** *Live* games are lockstep over a shared room: the host publishes
+  commands, everyone else replays them in step. *Day games* are turn-based over hours or days:
+  each move is stored, along with a checkpoint of the world after the latest turn, so anyone can
+  open the game later, load the checkpoint, replay the moves since and take their turn.
+- **No game server.** The page talks to Firebase directly. Firebase only stores and relays; the
+  game runs entirely in each player's browser.
+
+The full write-up (netcode, storage layout, leases, the renderer) is in
+[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+
+## What's in it
+
+**A world that reacts**
+- Falling-sand simulation of 21 materials, run in 32 × 32 chunks so only the parts that move cost
+  anything.
+- Chemistry: lava and water make obsidian and steam, oil burns and runs downhill, gas drifts and
+  ignites, gunpowder chains, acid dissolves (rock holds out longer), electricity runs through
+  water and metal.
+- A heat grid, a wind field, weather (rain, snow, blizzards, storms), and day, dusk and night.
+- A deadly floor of lava, deep water or void: fall in and you're gone.
+
+**Twelve shells**
+
+| Shell | Does |
+|---|---|
+| Thumper | Digs a hole. Reliable. |
+| Grandmother | Takes a fifth of the map with her. |
+| Corkscrew | Burrows in, then heaves it all up. |
+| Hot Supper | Burning oil. Runs downhill. Hates water. |
+| Magma Jar | A pool of lava that keeps creeping. |
+| Bilge Shot | A wave. Washes tanks off ledges. |
+| Cold Shoulder | Water to ice, tanks to statues. |
+| Vinegar | Eats straight down. Rock sulks but holds. |
+| Stink Can | A cloud that drifts until something lights it. |
+| Rattler | No crater. Loose ground lets go. |
+| Sandbag | A hill of sand, on their heads. |
+| Live Wire | Lethal in water. Runs along metal too. |
+
+Any shell can be split into three mid-flight.
+
+**Places**
+- Six lands (Grasslands, Arctic, Volcanic, Swamp, Desert, Ruins), each with its own limited
+  palette, layered rock, caves, mesas and arches, fossils, gem veins worth cash, and a landmark: a
+  lighthouse, a windmill, a radio mast, a shrine, a stilt hut, a giant skeleton.
+- Twelve hand-picked named maps, a map of the day, and endless generated ones.
+
+**Ways to play**
+- Matches against up to five bots, with a shop between rounds.
+- King of the Hill, Demolition, and Expedition (a co-op descent to a boss).
+- Eight training missions with star ratings.
+- The Worm: something big lives underground. A bot can play it, or a friend can.
+- Online with friends, live or as a day game, with a game manager to resume, leave, end or delete.
+
+**Crews with character**
+- A recurring bot cast (Rusty, Sarge, Mortimer, Dot, Hal, Brick, Nell and Gus) with fixed
+  temperaments, pixel portraits and radio chatter. They hold grudges, and remember them between
+  games.
+
+**Feel**
+- Kill cam with slow motion, a highlight reel, a photo mode and thermal vision.
+- A ghost trail of your last shot, so you can correct your aim.
+- Squash and stretch, screen shake, haptics on phones, and synthesized sound and music.
+
+## Under the hood
+
+| | |
+|---|---|
+| Code | ~6,400 lines of JavaScript in one `index.html`, plain ES2020, no framework |
+| World | 1280 × 720 grains, 21 materials, simulated in 32 × 32 chunks with sleep and wake |
+| Simulation | Fixed 60 Hz tick, seeded RNG, table-free trigonometry; state snapshots for kill cam and replays |
+| Rendering | WebGL2 with 8 shaders: a per-land limited palette applied through a 32³ colour lookup table, luminance-stepped light with ordered dithering, emissive glow, water reflections, thermal vision. A 2D canvas fallback without WebGL2, and automatic quality scaling |
+| Sound | Every effect and the theme tune are synthesized live with Web Audio; no audio files |
+| Netcode | Deterministic lockstep; live games relay commands through room presence, and day games store moves plus a 50–80 KB world checkpoint |
+| Online backend | Firebase Realtime Database and anonymous Auth, loaded only when online play starts; or the claude.ai Artifact platform when it runs there |
+| Phones | Thumb-zone layout in landscape, a thumb-stick aim, pinch zoom, a weapon tray, full screen, and installable as a home-screen app |
+| Tests | 24 Playwright browser tests: lockstep sync between browsers, day games across sessions, all missions solvable, touch controls, rendering of every land |
+
+### Built with
+
+Plain JavaScript · WebGL2 · Web Audio ·
+[Firebase](https://firebase.google.com/) Realtime Database and Authentication ·
+[Playwright](https://playwright.dev/) for tests ·
+[qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) for invite codes ·
+Google Fonts: Big Shoulders Stencil, Barlow Semi Condensed, IBM Plex Mono, Silkscreen and
+Special Elite
+
+## Controls
+
+| | Desktop | Phone |
+|---|---|---|
+| Aim | Drag on the field | Drag anywhere (thumb-stick) |
+| Drive | `A` / `D` (`R` undoes it) | ◀ ▶ buttons |
+| Change shell | `Q` / `E` | Weapon button, bottom left |
+| Fire | `Space` | Fire button |
+| Split a shell mid-air | `Space` again, or click | Split button (Fire, while it flies) |
+| Zoom | Mouse wheel; `Z` to see the whole map | Pinch; double-tap to see it all |
+| Speed up other turns | `F` | ▶▶ button |
+| Thermal vision · photo · pause | `T` · `P` · `Esc` | Top-right buttons |
+
+## Run it yourself
 
 ```bash
 npm run serve
 ```
 
-Then open http://localhost:8765/. Solo play, missions and expeditions work anywhere.
-Online play (live and day games) needs the page running as a claude.ai Artifact, because it
-uses the Artifact platform's `room`, `db` and `user` capabilities (see below).
-
-Controls: drag on the field to aim, `A`/`D` to drive, `Q`/`E` to change shells, `Space` to fire
-(again mid-air to split), `R` to undo driving, `F` to fast-forward other crews' turns,
-`T` for thermal vision, `P` for photo mode, `Esc` to pause.
-
-## What's in it
-
-- **World**: falling-sand simulation in 32x32 chunks with chemistry (lava and water make
-  obsidian and steam, gas ignites, gunpowder chains, acid eats down, electricity runs through
-  water and metal), a heat grid, wind field, weather, day and night.
-- **Maps**: per-land palettes and layered rock, mesas, arches, carved caves, fossils, gem veins
-  worth cash, a landmark per land (lighthouse, windmill, radio mast, shrine, stilt hut, giant
-  skeleton), props that burn, and a deadly floor of lava, deep water or void.
-  Twelve hand-picked named maps plus a map of the day.
-- **Modes**: match, King of the Hill, Demolition, Expedition (co-op descent to a boss), 8 missions.
-- **Crews**: a recurring bot cast (Rusty, Sarge, Mortimer, Dot, Hal, Brick, Nell, Gus) with fixed
-  temperaments, portraits, radio chatter and grudges that persist on the device.
-- **Feel**: kill cam and slow motion, highlight reel, ghost trail of your last shot, squash and
-  stretch, synthesized sound and a theme tune.
-- **Rendering**: WebGL2 with a limited per-land palette, dithered light, emissive glow, water
-  reflections and thermal vision; a 2D canvas fallback when WebGL2 is missing. Quality adjusts
-  itself to keep the frame rate up.
-
-## How it works
-
-**Deterministic simulation.** Everything that changes the world runs in a fixed 60 Hz `tick()`
-using only deterministic math: a seeded RNG (`rnd()`), table-free sine and cosine (`dsin`/`dcos`),
-and `+ - * / sqrt floor`. `Math.random` is only used for looks. Rendering, particles, sound and
-camera never feed back into the simulation. `snapshot()`/`restore()` capture the whole
-simulation state (used by the kill cam and replays), and `serializeWorld()`/`loadWorld()` turn
-it into a compact string.
-
-**Commands.** Every player action is a command: `round`, `turn` (drive steps, angle, power,
-weapon), `worm`, `split`. A command applied at the same tick produces the same world everywhere,
-so online play only ever sends commands.
-
-**Live online play** (`NET`, uses `room`): the host runs the game and publishes recent commands in
-its room presence (capped under 4 KB); joiners replay them in lockstep and never run ahead of the
-host. Late joiners download the world in 3 KB chunks over a second room. There is no turn timer;
-after 20 seconds the host may hand a missing player's turn to a bot.
-
-**Day games** (`DAY`, uses `db` and `user`): turn-based play over hours or days.
-
-- `games/{code}`: the game card (players, seat order, rules, status, whose turn, standings).
-- `games/{code}/moves/m000001...`: one document per command, in order.
-- `games/{code}/state/ckpt`: a checkpoint of the world after the latest settled turn (~50-80 KB).
-- `games/{code}/kits/{uid}`: each player's shop order for the next round.
-- `games/{code}/lock/turn` and `/lock/seat`: short leases so only one copy plays a bot's turn,
-  starts a round or edits the seats.
-
-Opening a game loads the checkpoint and replays the moves after it. While someone is aiming the
-world holds still, so a turn can wait any length of time and every copy still agrees. Your own
-shot is sent once it has landed (so a mid-air split travels with it), then you save the next
-checkpoint. Bots move whenever anyone has the game open. A player who leaves keeps their tank as a
-bot until the round ends. The day game manager (Play with friends) lists your games and lets you
-resume, leave, end, hide or delete them.
-
-**Capabilities declared** when published as an Artifact: `room`, `db`, `user`, `downloads`
-(photo mode saves PNGs). Only people with more than view-only access to the Artifact can write to
-`db`, so friends need that access to play day games.
-
-## Working on it
-
-`index.html` is organized in sections (search for the `// ====` banners): materials and themes,
-rules, terrain generation, the sand simulation, tanks, weapons and explosions, weather, state
-and serialization, rounds and turns, bots, the main tick, `NET`, `DAY`, effects, rendering
-(camera, overlay, `GLR` WebGL renderer, quality), sound and music, HUD, menus and boot.
-
-After editing, keep the file ASCII-only (some hosts mangle other characters) and check it parses:
+Then open http://localhost:8765/. Solo play, missions and expeditions work anywhere. Online play needs a backend: put your own free Firebase project's config in
+`FIREBASE_CONFIG` near the top of the script in `index.html`, then deploy:
 
 ```bash
-npm run normalize
+npx firebase-tools login
 ```
 
-`window.__shellfall` exposes test hooks (stepping the simulation, state hashes, aiming helpers).
+```bash
+npx firebase-tools deploy --only hosting,database
+```
+
+[docs/HOSTING.md](docs/HOSTING.md) walks through setting up Firebase step by step and explains
+the database rules and the free-plan limits.
 
 ## Tests
 
-Browser tests drive the real page with Playwright, against the local server.
-
 ```bash
 npm install
-npx playwright install chromium
-npm run test:quick
-npm test
 ```
 
-`test:quick` runs the core checks in about 6 minutes; `npm test` runs everything (much longer
-with software WebGL). Each test prints what it measured; logs and screenshots land in
-`tests/output/`. Live and day games are tested against stand-ins for the platform:
-`tests/mocks/mockroom.js` (room presence over BroadcastChannel) and `tests/mocks/mockdb.js`
-(the db and user capabilities on localStorage, with live updates and leases).
+```bash
+npx playwright install chromium
+```
+
+```bash
+npm run test:quick
+```
+
+`test:quick` runs the core checks in about six minutes; `npm test` runs everything. Each test
+prints what it measured; logs and screenshots land in `tests/output/`. Online play is tested
+between separate browsers against stand-ins for the backend, and against the real Firebase
+emulators with `npm run emulators` and `npm run test:firebase`.
 
 ## Known gaps
 
-- Day games have only been tested against the mock database, not the real one at scale.
-- A day-game player can fire, see the result, close the tab before the shot is sent, and retry.
-- Players in a day game can technically write any move; it's built for friends, not strangers.
-- Only tested in Chromium. Phones, real GPUs, the Google Fonts and the audio haven't been checked
-  on real hardware.
-- No push notifications for "your turn".
+- Built for friends, not strangers: anyone with a game's code can join it, and a determined
+  player could tamper with their own moves.
+- In a day game, a player could fire, see where it lands, close the tab before it's sent and
+  try again.
+- Your player identity lives in your browser. Switching browser or phone makes you a new player.
+- No "your turn" notifications yet.
+
+## Who made it
+
+Shellfall was created by **Mike Warren** ([@dinosaurmike](https://github.com/dinosaurmike)).
