@@ -26,7 +26,10 @@ const MOCK = fs.readFileSync(require('path').join(__dirname, 'mocks', 'mockdb.js
   await B.click('#btnJoin'); await B.waitForTimeout(1500);
   console.log('B in lobby', await B.evaluate(() => !document.getElementById('dayModal').hidden), 'players', await A.evaluate(() => document.getElementById('dayPlayers').textContent));
   await A.click('#btnDayStart'); await A.waitForTimeout(1500);
-  const settle = async () => { for (let i = 0; i < 80; i++) { const [a, bb] = [await st(A), await st(B)]; if (a.ph === 'aim' && bb.ph === 'aim' && a.turn === bb.turn) return [a, bb]; if (a.ph === 'roundover' && bb.ph === 'roundover') return [a, bb]; await A.waitForTimeout(250); } return [await st(A), await st(B)]; };
+  // compare only when both copies are at rest at the same point: aiming on the same turn, or both
+  // showing the round's results. Comparing mid-flight compares two different moments.
+  const atRest = (a, bb) => (a.ph === 'aim' && bb.ph === 'aim' && a.turn === bb.turn) || (a.ph === 'roundover' && bb.ph === 'roundover' && a.turn === bb.turn);
+  const settle = async (P = A, Q = B) => { for (let i = 0; i < 240; i++) { const [a, bb] = [await st(P), await st(Q)]; if (atRest(a, bb)) return [a, bb]; await A.waitForTimeout(250); } const r = [await st(P), await st(Q)]; console.log('  STALLED', JSON.stringify(r.map(x => [x.ph, x.turn]))); process.exitCode = 1; return r; };
   let same = 0, diff = 0;
   for (let k = 0; k < 6; k++) {
     const [a, bb] = await settle();
@@ -55,7 +58,7 @@ const MOCK = fs.readFileSync(require('path').join(__dirname, 'mocks', 'mockdb.js
   console.log('B2 card button:', await B2.evaluate(() => document.getElementById('btnDayResume').textContent));
   await B2.click('#btnDayResume');
   await B2.waitForTimeout(2500);
-  const b2 = await st(B2), a2 = await st(A);
+  const [b2, a2] = await settle(B2, A);
   console.log('B2 loaded: turn', b2.turn, 'mine', b2.mine, 'hash match', b2.hash === a2.hash, b2.ph, a2.ph);
   if (b2.mine) {
     await B2.evaluate(() => { const g = window.__shellfall, t = g.myTank(); const foe = g.tanks.find(o => o.alive && o.ctrl === 'bot') || g.tanks.find(o => o.alive && o.id !== t.id); g.aimAt(foe.x, foe.y - 5, 'shell'); g.fireMine(); });

@@ -9,7 +9,7 @@
     "test": "node tests/run.js",
     "test:quick": "node tests/run.js quick",
     "emulators": "firebase emulators:start --only database,auth --project demo-shellfall",
-    "test:firebase": "node tests/run.js firebase",
+    "test:firebase": "node tests/run.js firebase firebase-reconnect",
     "deploy": "firebase deploy --only hosting,database"
   },
   "devDependencies": {

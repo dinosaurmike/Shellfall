@@ -48,6 +48,9 @@ flowchart LR
   open the game later, load the checkpoint, replay the moves since and take their turn.
 - **No game server.** The page talks to Firebase directly. Firebase only stores and relays; the
   game runs entirely in each player's browser.
+- **One explicit turn cycle.** Every turn moves through menu, aim, flight, settle, kill cam and round
+  over, and each change is checked against a transition table, so an impossible jump shows up as an
+  error instead of a stuck game.
 
 The full write-up (netcode, storage layout, leases, the renderer) is in
 [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
@@ -117,7 +120,7 @@ Any shell can be split into three mid-flight.
 | Netcode | Deterministic lockstep; live games relay commands through room presence, and day games store moves plus a 50–80 KB world checkpoint |
 | Online backend | Firebase Realtime Database and anonymous Auth, loaded only when online play starts; or the claude.ai Artifact platform when it runs there |
 | Phones | Thumb-zone layout in landscape, a thumb-stick aim, pinch zoom, a weapon tray, full screen, and installable as a home-screen app |
-| Tests | 24 Playwright browser tests: lockstep sync between browsers, day games across sessions, all missions solvable, touch controls, rendering of every land |
+| Tests | 26 Playwright browser tests: lockstep sync between browsers, day games across sessions, all missions solvable, touch controls, rendering of every land, and the real Firebase emulators for self-hosted online play. Every test also fails on an illegal turn-phase change |
 
 ### Built with
 

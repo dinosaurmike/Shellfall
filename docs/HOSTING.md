@@ -5,6 +5,11 @@
 Firebase's free Spark plan hosts the page and runs online play for a group of friends. Nobody
 needs an account: each browser signs in anonymously, and players pick a name in the game.
 
+This copy is already set up for the Shellfall project (`shellfall-2a422`): its web config is in
+`FIREBASE_CONFIG` near the top of the script in `index.html`, and `.firebaserc` names the project.
+To redeploy it, skip to step 5. To run your own copy on your own Firebase project, follow all the
+steps and replace both.
+
 1. **Create the project.** At https://console.firebase.google.com choose **Add project**
    (Analytics can be off).
 2. **Realtime Database.** **Build > Realtime Database > Create database**, pick a location,
@@ -14,8 +19,8 @@ needs an account: each browser signs in anonymously, and players pick a name in 
    Enable**.
 4. **Web config.** **Project settings (gear) > Your apps > Web (`</>`)**, register an app (no
    Firebase Hosting checkbox needed), then copy the `firebaseConfig` values into `index.html`:
-   search for `const FIREBASE_CONFIG = null;` near the top of the script and replace `null` with
-   the object. It must include `databaseURL` (it appears once the Realtime Database exists).
+   search for `const FIREBASE_CONFIG =` near the top of the script and replace the object with
+   yours. It must include `databaseURL` (it appears once the Realtime Database exists).
    These values are not secret; the database rules protect the data.
 5. **Deploy** the page and the rules from this folder (needs Node.js; `.firebaserc` names the
    project, so change it if yours is not `shellfall-2a422`):

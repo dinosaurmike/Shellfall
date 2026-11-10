@@ -12,6 +12,33 @@ camera never feed back into the simulation. `snapshot()`/`restore()` capture the
 simulation state (used by the kill cam and replays), and `serializeWorld()`/`loadWorld()` turn
 it into a compact string.
 
+**Turn phases.** The game is always in one phase, and every change goes through `setPhase()`,
+which checks it against a table (`PHASES`) and reports any other change as an error (the browser
+tests fail on it):
+
+```mermaid
+stateDiagram-v2
+  [*] --> menu
+  menu --> aim: round starts
+  wait --> aim: world downloaded or loaded
+  aim --> aim: next actor, or a new round
+  aim --> flight: shot fired or the worm moves
+  aim --> roundover: last crew standing
+  flight --> settle: nothing moving
+  settle --> aim: next turn
+  settle --> killcam: a kill, with kill cam on
+  settle --> roundover
+  killcam --> aim
+  killcam --> roundover
+  killcam --> killcam: next highlight
+  roundover --> aim: next round
+  roundover --> killcam: highlight reel
+```
+
+`menu` (leaving a game) and `wait` (joining online, re-downloading the world) can be entered from
+any phase. Day games hold the world still in `aim`; nothing simulates in `menu`, `wait` or
+`roundover`.
+
 **Commands.** Every player action is a command: `round`, `turn` (drive steps, angle, power,
 weapon), `worm`, `split`. A command applied at the same tick produces the same world everywhere,
 so online play only ever sends commands.
@@ -27,8 +54,9 @@ after 20 seconds the host may hand a missing player's turn to a bot.
 - `games/{code}/moves/m000001...`: one document per command, in order.
 - `games/{code}/state/ckpt`: a checkpoint of the world after the latest settled turn (~50-80 KB).
 - `games/{code}/kits/{uid}`: each player's shop order for the next round.
-- `games/{code}/lock/turn` and `/lock/seat`: short leases so only one copy plays a bot's turn,
-  starts a round or edits the seats.
+- `games/{code}/lock/turn` and `/lock/seat`: 5-second leases so only one copy plays a bot's turn,
+  starts a round or edits the seats. Leases can't be released early, only left to expire, so they
+  are kept short and a busy one is retried for a few seconds before giving up.
 
 Opening a game loads the checkpoint and replays the moves after it. While someone is aiming the
 world holds still, so a turn can wait any length of time and every copy still agrees. Your own

@@ -32,7 +32,8 @@ const { chromium } = require('playwright');
     const g = window.__shellfall, t0 = performance.now();
     const look = () => {
       const p = g.projs.find(p => p.primary && p.mode === 'fly');
-      if (g.phase === 'flight' && p && p.age >= lo && p.age < hi) { document.getElementById('btnFire').click(); return setTimeout(() => res({ ph: g.phase, age: +p.age.toFixed(2), split: !!(g.shot && (g.shot.splitTick || g.shot.splitAsked)) }), 80); }
+      const mine = g.shot && g.tanks[g.cur] && g.tanks[g.cur].ctrl === 'me';   // only during your own shot
+      if (g.phase === 'flight' && mine && p && p.age >= lo && p.age < hi) { document.getElementById('btnFire').click(); return setTimeout(() => res({ ph: g.phase, age: +p.age.toFixed(2), split: !!(g.shot && (g.shot.splitTick || g.shot.splitAsked)) }), 80); }
       if (performance.now() - t0 > 6000) return res({ timeout: true, ph: g.phase });
       requestAnimationFrame(look);
     };

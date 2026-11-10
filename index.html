@@ -703,6 +703,16 @@ const FB = {
         const onSet = sn => { if (sn.key !== me) { others.set(sn.key, read(sn)); rebuild(); } };
         const onDel = sn => { if (others.delete(sn.key)) rebuild(); };
         ref.on('child_added', onSet); ref.on('child_changed', onSet); ref.on('child_removed', onDel);
+        // the server drops our presence when the connection drops; on every (re)connect, arm the
+        // drop again and write our presence back, like the claude.ai room does
+        let online = false;
+        const cl = new Set();
+        const conn = db.ref('.info/connected');
+        const onConn = sn => {
+          online = !!sn.val();
+          if (online && live) { mine.onDisconnect().remove().catch(() => {}); sent = ''; if (!timer) timer = setTimeout(flush, 0); }
+          for (const f of cl) try { f(online); } catch (e) {}
+        };
         await mine.onDisconnect().remove();
         // writes are coalesced (one per 33 ms) and skipped when nothing changed
         const flush = () => {
@@ -712,6 +722,7 @@ const FB = {
           sent = j;
           mine.set({ j, t: window.firebase.database.ServerValue.TIMESTAMP }).catch(e => console.warn('presence', e));
         };
+        conn.on('value', onConn);
         return {
           name,
           presence: async patch => {
@@ -721,11 +732,11 @@ const FB = {
           },
           peers: () => snap,
           onPeers: f => { ls.add(f); setTimeout(() => { if (live && ls.has(f)) f({ peers: snap, joined: snap, left: [], updated: [] }); }, 0); return () => ls.delete(f); },
-          connected: () => true,
-          onConnection: f => { setTimeout(() => f(true), 0); return () => {}; },
+          connected: () => online,
+          onConnection: f => { cl.add(f); setTimeout(() => { if (cl.has(f)) f(online); }, 0); return () => cl.delete(f); },
           emit: async () => {}, on: () => () => {},
           leave: async () => {
-            live = false; ls.clear(); clearTimeout(timer);
+            live = false; ls.clear(); cl.clear(); clearTimeout(timer); conn.off('value', onConn);
             ref.off('child_added', onSet); ref.off('child_changed', onSet); ref.off('child_removed', onDel);
             try { await mine.onDisconnect().cancel(); await mine.remove(); } catch (e) {}
           },
@@ -1180,7 +1191,35 @@ function abyssFor(setting, theme) {
   if (setting === 'auto') return (THEMES[theme] || THEMES.temperate).abyss || 'water';
   return ['lava', 'water', 'void'].includes(setting) ? setting : null;
 }
-let phase = 'menu';     // menu, wait, aim, flight, settle, killcam, roundover
+let phase = 'menu';
+// The turn phase. Every change goes through setPhase, which checks it against this table.
+//   menu       title screen, nothing simulates
+//   wait       online, waiting for the host, a download or a game card
+//   aim        someone is aiming (day games hold the world still here)
+//   flight     shells, debris, blasts or the worm still moving
+//   settle     the dust settling before the next turn
+//   killcam    a replay: the kill cam or the highlight reel
+//   roundover  the round's results
+// menu and wait can be entered from anywhere (leaving a game, joining, re-downloading the world).
+const PHASES = {
+  menu: ['aim'],
+  wait: ['aim'],
+  aim: ['aim', 'flight', 'roundover'],
+  flight: ['settle'],
+  settle: ['aim', 'roundover', 'killcam'],
+  killcam: ['killcam', 'aim', 'roundover'],
+  roundover: ['roundover', 'aim', 'killcam'],
+};
+const phaseErrors = [];
+function setPhase(next) {
+  const ok = PHASES[next] && (next === 'menu' || next === 'wait' || next === phase || PHASES[phase].includes(next));
+  if (!ok) {
+    const msg = `Shellfall: illegal phase change ${phase} -> ${next}`;
+    phaseErrors.push(msg);
+    setTimeout(() => { throw new Error(msg); }, 0);   // surfaces in the console and fails the browser tests
+  }
+  phase = next;
+}
 let settleTicks = 0;
 let shot = null, kc = null, replaying = false, paused = false;
 let mode = 'match', stage = 0;
@@ -2445,7 +2484,7 @@ function execWorm(c) {
   if (d > WORM_RANGE) { tx = worm.x + dx / d * WORM_RANGE; ty = worm.y + dy / d * WORM_RANGE; }
   worm.surfaced = false;
   wormMove = { tx, ty, act: ['burrow', 'erupt', 'swallow'].includes(c.act) ? c.act : 'burrow', ticks: 0 };
-  phase = phase === 'killcam' ? 'killcam' : 'flight';
+  setPhase(phase === 'killcam' ? 'killcam' : 'flight');
 }
 function wormMoveTick() {
   const m = wormMove;
@@ -3210,6 +3249,10 @@ function applyKit(t, kit) {
   }
 }
 function applyRound(c) {
+  // a new round can start at any moment on the host (Settings > New game mid-flight): it's a full
+  // reset, so pass through wait, and put away a kill cam that was playing
+  setPhase('wait');
+  $('kc').hidden = true; hideBanner();
   if (NET.role === 'day') hideModal(dayModal);
   fitView();
   if (typeof c.at === 'number') tickN = c.at;
@@ -3416,7 +3459,7 @@ function startTurn(i) {
 }
 function beginAim() {
   stamp.fill(0); active.fill(1);
-  phase = 'aim';
+  setPhase('aim');
   aimStart = performance.now();
   botState = null;
   preview = isWormSlot(cur) ? null : { steps: [], ghost: JSON.parse(JSON.stringify(tanks[cur])) };
@@ -3447,7 +3490,7 @@ function execTurn(c) {
   fire(t, t.angle, t.power, t.weapon);
   if (c.say) bark(t, 'fire', String(c.say));
   if (mode === 'mission' && mission && !replaying) mission.shots++;
-  phase = 'flight';
+  setPhase('flight');
   preview = null;
   closeWeaponMenu();
   updateHud();
@@ -3489,7 +3532,7 @@ function afterShot() {
   nextTurn();
 }
 function roundOver() {
-  phase = 'roundover';
+  setPhase('roundover');
   const alive = new Set();
   for (const t of tanks) if (t.alive) alive.add(t.team);
   if (worm && worm.alive) alive.add(worm.team);
@@ -3518,11 +3561,11 @@ function beginReplay(pre, rec, splitTick) {
   restore(pre);
   fx.clear();
   replaying = true;
-  phase = 'killcam';
+  setPhase('killcam');
   shot = { turnNo, owner: rec.t === 'worm' ? WORM_ID : tanks[cur].id, rec, pre: null, kills: [], splitTick, dmg: 0 };
   if (rec.t === 'worm') execWorm(rec);
   else { const t = tanks[cur]; for (const d of decodeSteps(rec.steps)) driveStep(t, cur, d, false); fire(t, clamp(rec.a | 0, 0, 180), clamp(rec.p | 0, 5, 100), rec.w | 0); }
-  phase = 'killcam';
+  setPhase('killcam');
   $('kc').hidden = false;
   hideBanner();
   updateHud();
@@ -3556,9 +3599,9 @@ function endKillcam() {
   $('kc').hidden = true;
   hideBanner();
   ts = 1;
-  if (onEnd === 'reel' && nextReel != null) { phase = 'roundover'; shot = null; watchBest(nextReel); return; }
-  if (onEnd === 'roundover' || onEnd === 'reel') { phase = 'roundover'; shot = null; showModal(roundModal); updateHud(); return; }
-  if (onEnd === 'mission') { phase = 'roundover'; shot = null; showMissionResult(); updateHud(); return; }
+  if (onEnd === 'reel' && nextReel != null) { setPhase('roundover'); shot = null; watchBest(nextReel); return; }
+  if (onEnd === 'roundover' || onEnd === 'reel') { setPhase('roundover'); shot = null; showModal(roundModal); updateHud(); return; }
+  if (onEnd === 'mission') { setPhase('roundover'); shot = null; showMissionResult(); updateHud(); return; }
   afterShot();
 }
 function killLabel(kills) {
@@ -3660,7 +3703,7 @@ function missionCheck() {
       if (!all[mission.i] || all[mission.i] < stars) { all[mission.i] = stars; try { localStorage.setItem('shellfall-missions', JSON.stringify(all)); } catch (e) {} }
     }
     if (won && shot && shot.kills.length && shot.pre && prefs.killcam) { startKillcam(); kc.onEnd = 'mission'; return; }
-    shot = null; phase = 'roundover';
+    shot = null; setPhase('roundover');
     showMissionResult();
     return;
   }
@@ -3902,7 +3945,7 @@ function tick() {
     if (roundDone()) { roundOver(); return; }
     if (NET.role !== 'client' && actorCtrl(cur) === 'bot') botTick();
     else if (NET.role === 'host') NET.hostAimTick();
-  } else if (phase === 'flight') { if (!projs.length && !wormMove && !events.length && !debris.length) { phase = 'settle'; settleTicks = 0; } }
+  } else if (phase === 'flight') { if (!projs.length && !wormMove && !events.length && !debris.length) { setPhase('settle'); settleTicks = 0; } }
   else if (phase === 'settle') {
     settleTicks++;
     const quiet = movedCount < 20 && !events.length && !tanks.some(t => t.alive && t.air);
@@ -4165,7 +4208,7 @@ const NET = {
     this.role = 'client';
     this.game.presence({ role: 'player', cid: this.cid, name, want }).catch(() => {});
     this.hostSeenAt = performance.now();
-    phase = 'wait';
+    setPhase('wait');
     this.statusText = 'Looking for the game\u2026';
     return true;
   },
@@ -4173,7 +4216,7 @@ const NET = {
   async startSync() {
     if (this.syncing) return;
     this.syncing = true; this.parts = null; this.partsId = null;
-    phase = 'wait'; kc = null; replaying = false; $('kc').hidden = true;
+    setPhase('wait'); kc = null; replaying = false; $('kc').hidden = true;
     this.statusText = 'Downloading the battlefield\u2026';
     try {
       if (!this.xfer) { this.xfer = await this.room.join('sf-' + this.code + '-x'); this.xfer.onPeers(() => this.collect()); }
@@ -4217,7 +4260,7 @@ const NET = {
     this.hostCmds = Array.isArray(hp.cmds) ? hp.cmds.filter(c => c && typeof c.s === 'number' && typeof c.at === 'number') : [];
     if (Array.isArray(hp.seats)) this.applySeats(hp.seats);
     if (this.syncing) return;
-    if (this.hostSeq === 0) { phase = 'wait'; this.statusText = 'Joined. Waiting for the host to start.'; return; }
+    if (this.hostSeq === 0) { setPhase('wait'); this.statusText = 'Joined. Waiting for the host to start.'; return; }
     this.applyDue();
   },
   nextCmd() { return (this.hostCmds || []).find(q => q.s === this.applied + 1) || null; },
@@ -4290,9 +4333,10 @@ const NET = {
 // While a player is aiming the world holds still, so every copy agrees.
 // =====================================================================
 const pad6 = n => String(n).padStart(6, '0');
+const LOCK_MS = 5000;
 const DAY = {
   db: null, user: null, uid: null, tried: false, code: '', meta: null, unsubs: [], queue: [], applied: 0,
-  pending: null, writing: false, ckptSeq: 0, botBusy: false, roundBusy: false, kits: {}, loaded: false, tab: Math.random().toString(36).slice(2, 8),
+  pending: null, writing: false, mineToCkpt: false, ckptSeq: 0, botBusy: false, roundBusy: false, kits: {}, loaded: false, tab: Math.random().toString(36).slice(2, 8),
   async ready() {
     if (this.db) return true;
     if (this.tried && !this.db && hasClaude()) return false;
@@ -4303,16 +4347,24 @@ const DAY = {
       const uid = await user.id();
       if (!uid) return false;
       this.db = db; this.user = user; this.uid = uid;
+      try { localStorage.setItem('shellfall-online', '1'); } catch (e) {}
       return true;
     } catch (e) { return false; }
   },
   gameRef(code) { return this.db.doc('games/' + code); },
   movesCol(code) { return this.db.collection('games/' + code + '/moves'); },
-  async withLock(name, fn) {
-    const ref = this.db.doc('games/' + this.code + '/lock/' + name);
-    let r; try { r = await ref.acquire({ holder: this.uid + ':' + this.tab, ttlMs: 20000 }); } catch (e) { return false; }
-    if (!r.acquired) return false;
-    try { await fn(); } finally {}
+  // Leases can't be released, only left to expire, so they're short (LOCK_MS) and a busy one is
+  // retried for a little longer than that before giving up. The game code is passed in, never
+  // borrowed from this.code, so managing one game never touches the one that's open.
+  async withLock(name, fn, code) {
+    const ref = this.db.doc('games/' + (code || this.code) + '/lock/' + name);
+    let got = false;
+    for (let tries = 0; tries < 8 && !got; tries++) {
+      if (tries) await new Promise(r => setTimeout(r, 800));
+      try { got = (await ref.acquire({ holder: this.uid + ':' + this.tab, ttlMs: LOCK_MS })).acquired; } catch (e) { return false; }
+    }
+    if (!got) return false;
+    await fn();
     return true;
   },
   async create(name) {
@@ -4336,31 +4388,31 @@ const DAY = {
     if (d.status === 'done') return 'That day game has finished.';
     if (d.uids.includes(this.uid)) return null;
     if (d.players.length >= 8) return 'That day game is full.';
-    this.code = code;
     const ok = await this.withLock('seat', async () => {
       const cur = (await ref.get()).data();
       if (cur.uids.includes(this.uid)) return;
       const order = (cur.seatOrder || cur.players.map(p => p.uid)).filter(u => u !== this.uid).concat([this.uid]);
       await ref.update({ players: cur.players.concat([{ uid: this.uid, name }]), uids: cur.uids.concat([this.uid]), seatOrder: order, updated: Date.now() });
-    });
-    return ok ? null : 'Someone else is joining right now. Try again in a moment.';
+    }, code).catch(() => false);
+    return ok ? null : 'Could not join just now. Try again in a moment.';
   },
   close() {
     for (const u of this.unsubs) try { u(); } catch (e) {}
-    this.unsubs = []; this.queue = []; this.applied = 0; this.meta = null; this.code = ''; this.pending = null; this.loaded = false;
+    this.unsubs = []; this.queue = []; this.applied = 0; this.meta = null; this.code = ''; this.pending = null; this.loaded = false; this.mineToCkpt = false;
   },
   // open a game: load the latest checkpoint, then follow the moves after it
   async open(code) {
     this.close();
     if (!(await this.ready())) return false;
     this.code = code;
+    tanks = []; worm = null; projs = []; events = []; debris = []; shot = null; kc = null; replaying = false;
+    setPhase('menu'); this.applied = 0; this.ckptSeq = 0;
     NET.role = 'day';
     const ck = await this.db.doc('games/' + code + '/state/ckpt').get().catch(() => null);
-    tanks = []; worm = null; projs = []; events = []; debris = []; shot = null; kc = null; replaying = false;
-    phase = 'menu'; this.applied = 0; this.ckptSeq = 0;
+    if (this.code !== code) return 'superseded';   // another game was opened meanwhile
     if (ck && ck.exists) {
       const d = ck.data();
-      try { loadWorld(d.world); this.applied = d.seq; this.ckptSeq = d.seq; phase = 'wait'; beginAim(); } catch (e) { console.warn('checkpoint', e); this.applied = 0; phase = 'menu'; }
+      try { loadWorld(d.world); this.applied = d.seq; this.ckptSeq = d.seq; setPhase('wait'); beginAim(); } catch (e) { console.warn('checkpoint', e); this.applied = 0; setPhase('menu'); }
     }
     this.unsubs.push(this.gameRef(code).onSnapshot(snap => { if (snap.exists) { this.meta = snap.data(); updateDayUi(); } }, () => {}));
     this.unsubs.push(this.movesCol(code).where('s', '>', this.applied).orderBy('s').onSnapshot(qs => {
@@ -4400,17 +4452,17 @@ const DAY = {
     const p = this.pending;
     if (!p || this.writing) return;
     this.writing = true;
-    const c = p.c;
+    const c = p.c, code = this.code;
     if (c.t === 'turn' && p.splitTick) c.splitAt = p.splitTick;
     try {
-      await this.movesCol(this.code).doc('m' + pad6(p.s)).set({ s: p.s, c, by: this.uid, t: Date.now() });
-      if (this.pending === p) this.pending = null;
-      this.mineToCkpt = true;
-      this.writing = false;
-      if ((phase === 'aim' || phase === 'roundover') && !shot) this.checkpoint();
-      return;
+      await this.movesCol(code).doc('m' + pad6(p.s)).set({ s: p.s, c, by: this.uid, t: Date.now() });
     } catch (e) { setTimeout(() => { this.writing = false; this.flush(); }, 4000); return; }
     this.writing = false;
+    if (this.code !== code) { if (this.pending) this.flush(); return; }   // you've moved on to another game
+    if (this.pending === p) this.pending = null;
+    this.mineToCkpt = true;
+    if (this.pending) { this.flush(); return; }
+    if ((phase === 'aim' || phase === 'roundover') && !shot) this.checkpoint();
   },
   // after a move resolves, the player who made it saves a checkpoint and updates the lobby card
   async checkpoint() {
@@ -4420,8 +4472,12 @@ const DAY = {
     try {
       if (phase === 'aim' && seq > this.ckptSeq) { await this.db.doc('games/' + this.code + '/state/ckpt').set({ seq, world: serializeWorld(), t: Date.now() }); this.ckptSeq = seq; }
       const who = phase === 'aim' ? (isWormSlot(cur) ? { name: worm.name, uid: worm.ctrl } : { name: tanks[cur].name, uid: tanks[cur].ctrl }) : { name: 'Round over', uid: null };
-      const g = this.meta || {};
-      await this.gameRef(this.code).update({ seq, round, updated: Date.now(), status: g.status === 'done' ? 'done' : 'playing', turn: g.status === 'done' ? null : who, standings: this.standings() });
+      // read the card fresh: only a lobby moves to playing, and an ended game stays ended
+      const fresh = await this.gameRef(this.code).get();
+      const g = fresh.exists ? fresh.data() : (this.meta || {});
+      const patch = { seq, round, updated: Date.now(), turn: g.status === 'done' ? null : who, standings: this.standings() };
+      if (g.status === 'lobby') patch.status = 'playing';
+      await this.gameRef(this.code).update(patch);
     } catch (e) { this.mineToCkpt = true; }
   },
   // bots move when anyone has the game open; a lease makes sure only one copy decides
@@ -4429,25 +4485,29 @@ const DAY = {
     if (this.botBusy || this.queue.length || this.pending || phase !== 'aim' || (this.meta && this.meta.status === 'done')) return;
     if (actorCtrl(cur) !== 'bot' && !this.isGone(actorCtrl(cur))) return;
     this.botBusy = true;
-    const want = this.applied + 1, tn = turnNo;
-    await this.withLock('turn', async () => {
-      const exists = await this.movesCol(this.code).doc('m' + pad6(want)).get();
-      if (exists.exists || this.applied + 1 !== want || turnNo !== tn || phase !== 'aim') return;
-      if (isWormSlot(cur) && worm.ctrl === 'bot') { const pl = planWorm(); submitCmd({ t: 'worm', turnNo, tx: pl.tx, ty: pl.ty, act: pl.act }); }
-      else { const pl = planBot(cur); submitCmd({ t: 'turn', turnNo, steps: pl.steps, a: pl.a, p: pl.p, w: pl.w, say: pl.say || '' }); }
-    });
-    setTimeout(() => { this.botBusy = false; }, 1500);
+    const want = this.applied + 1, tn = turnNo, code = this.code;
+    try {
+      await this.withLock('turn', async () => {
+        const exists = await this.movesCol(code).doc('m' + pad6(want)).get();
+        if (exists.exists || this.code !== code || this.applied + 1 !== want || turnNo !== tn || phase !== 'aim') return;
+        if (isWormSlot(cur) && worm.ctrl === 'bot') { const pl = planWorm(); submitCmd({ t: 'worm', turnNo, tx: pl.tx, ty: pl.ty, act: pl.act }); }
+        else { const pl = planBot(cur); submitCmd({ t: 'turn', turnNo, steps: pl.steps, a: pl.a, p: pl.p, w: pl.w, say: pl.say || '' }); }
+      }, code);
+    } catch (e) { console.warn('bot turn', e); }
+    finally { setTimeout(() => { this.botBusy = false; }, 1500); }
   },
   async nextRound(keep, nextStage, same) {
     if (this.roundBusy || this.queue.length || this.pending) return;
     this.roundBusy = true;
-    const want = this.applied + 1;
-    await this.withLock('turn', async () => {
-      const exists = await this.movesCol(this.code).doc('m' + pad6(want)).get();
-      if (exists.exists) return;
-      submitCmd(makeRoundCmd(keep, nextStage, same));
-    });
-    this.roundBusy = false;
+    const want = this.applied + 1, code = this.code;
+    try {
+      await this.withLock('turn', async () => {
+        const exists = await this.movesCol(code).doc('m' + pad6(want)).get();
+        if (exists.exists || this.code !== code || this.applied + 1 !== want) return;
+        submitCmd(makeRoundCmd(keep, nextStage, same));
+      }, code);
+    } catch (e) { console.warn('next round', e); }
+    finally { this.roundBusy = false; }
   },
   seats() {
     // seat ids are fixed by when someone first joined, so a crew keeps its tank and score across rounds
@@ -4459,7 +4519,6 @@ const DAY = {
   isGone(ctrl) { return ctrl !== 'bot' && ctrl !== 'me' && !!this.meta && !this.meta.uids.includes(ctrl); },
   async leave(code) {
     if (!(await this.ready())) return 'Not signed in.';
-    const prev = this.code; this.code = code;
     const ref = this.gameRef(code);
     const ok = await this.withLock('seat', async () => {
       const g = (await ref.get()).data(); if (!g) return;
@@ -4468,8 +4527,7 @@ const DAY = {
       if (g.host === this.uid && players.length) patch.host = players[0].uid;
       if (!players.length) { patch.status = 'done'; patch.endedAt = Date.now(); }
       await ref.update(patch);
-    });
-    this.code = prev;
+    }, code).catch(() => false);
     return ok ? null : 'Busy right now. Try again in a moment.';
   },
   async end(code) {
@@ -4478,13 +4536,11 @@ const DAY = {
   },
   async hide(code) {
     if (!(await this.ready())) return 'Not signed in.';
-    const prev = this.code; this.code = code;
     const ok = await this.withLock('seat', async () => {
       const g = (await this.gameRef(code).get()).data(); if (!g) return;
       const hidden = (g.hiddenFor || []).filter(u => u !== this.uid).concat([this.uid]);
       await this.gameRef(code).update({ hiddenFor: hidden });
-    });
-    this.code = prev;
+    }, code).catch(() => false);
     return ok ? null : 'Busy right now. Try again in a moment.';
   },
   // everything the game stored: moves, checkpoint, shop orders, locks, then the card itself
@@ -6292,7 +6348,7 @@ function cycleWeapon(dir) {
 }
 function showModal(m) { m.hidden = false; }
 function hideModal(m) { m.hidden = true; }
-const anyModal = () => !startModal.hidden || !settingsModal.hidden || !roundModal.hidden || !inviteModal.hidden || !$('missionModal').hidden || !$('missionsModal').hidden;
+const anyModal = () => !startModal.hidden || !settingsModal.hidden || !roundModal.hidden || !inviteModal.hidden || !dayModal.hidden || !$('missionModal').hidden || !$('missionsModal').hidden;
 const isMineId = id => { const t = tankById(id); return !!t && (NET.role === 'client' ? t.ctrl === NET.cid : NET.role === 'day' ? t.ctrl === DAY.uid : t.ctrl === 'me'); };
 let expState = 'next', myKit = {};
 function myId() { const t = NET.role === 'client' ? tanks.find(q => q.ctrl === NET.cid) : tanks.find(q => q.ctrl === 'me'); return t ? t.id : null; }
@@ -6799,6 +6855,7 @@ async function openDayGame(code) {
   audioInit(); showNetErr('');
   NET.leave();
   const ok = await DAY.open(code);
+  if (ok === 'superseded') return;
   if (!ok) { showNetErr(hasClaude() ? 'Day games need this page open on claude.ai, signed in.' : onlineHelp()); NET.role = 'solo'; return; }
   hideModal(startModal); paused = false;
   // wait briefly for the game card, then show the lobby or drop straight into play
@@ -6857,7 +6914,7 @@ function exitToMenu() {
   NET.leave(); DAY.close(); hideModal(dayModal); document.title = 'Shellfall';
   for (const m of [settingsModal, roundModal, inviteModal, dayModal, $('missionModal'), $('missionsModal')]) hideModal(m);
   if (photo) exitPhoto();
-  phase = 'menu'; mode = 'match'; mission = null;
+  setPhase('menu'); mode = 'match'; mission = null;
   projs = []; events = []; debris = []; shot = null; kc = null; replaying = false; preview = null; wormMove = null;
   tanks = []; worm = null; hill = null; fort = null; round = 0; scores = {};
   fx.clear(); $('kc').hidden = true; hideBanner(); ts = 1; hitstop = 0; slowT = 0; camFocus = null;
@@ -6866,11 +6923,9 @@ function exitToMenu() {
   showModal(startModal); paused = true;
   updateHud();
 }
-let exitArmed = 0;
+// online, leaving takes a second tap on the same button (see armed())
 function armExit(btn) {
-  const now = performance.now();
-  if (NET.role === 'solo' || now - exitArmed < 3000) { exitArmed = 0; exitToMenu(); return; }
-  exitArmed = now; btn.textContent = 'Leave the online game?'; setTimeout(() => { btn.textContent = 'Exit to main menu'; }, 3000);
+  if (NET.role === 'solo' || armed(btn, btn.textContent, 'Leave the online game?')) exitToMenu();
 }
 function randomName() { const a = ['Rusty', 'Dusty', 'Lucky', 'Grim', 'Rapid', 'Quiet', 'Iron', 'Salty']; const b = ['Mortar', 'Shell', 'Track', 'Fuse', 'Barrel', 'Crater']; return a[(Math.random() * a.length) | 0] + ' ' + b[(Math.random() * b.length) | 0]; }
 
@@ -6878,7 +6933,7 @@ const held = new Set();
 window.addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') return;
   if (photo) { if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') exitPhoto(); else if (e.key === 't' || e.key === 'T') setThermal(!thermalOn); else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); photoWanted = true; } return; }
-  if (e.key === 'Escape') { if (!inviteModal.hidden) hideModal(inviteModal); else if (!settingsModal.hidden) closeSettings(); else if (startModal.hidden) openSettings(); return; }
+  if (e.key === 'Escape') { if (!inviteModal.hidden) hideModal(inviteModal); else if (!dayModal.hidden) $('btnDayClose').click(); else if (!settingsModal.hidden) closeSettings(); else if (startModal.hidden) openSettings(); return; }
   if (anyModal()) return;
   audioInit();
   if (phase === 'killcam' && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); endKillcam(); return; }
@@ -6917,7 +6972,7 @@ window.addEventListener('keyup', e => {
   if (e.key === 'd' || e.key === 'D') held.delete('d');
   moveDir = !held.size ? 0 : held.has('d') ? 1 : -1;
 });
-window.addEventListener('blur', () => { held.clear(); moveDir = 0; });
+window.addEventListener('blur', () => { held.clear(); moveDir = 0; ffHeld = false; });
 
 // =====================================================================
 // Boot
@@ -6948,12 +7003,15 @@ if (!$('joinName').value) $('joinName').value = randomName();
 refreshContinue();
 S = { ...rules, worm: 'off' };
 drawLogo();
-setTimeout(() => { refreshDayList().catch(() => {}); }, 600);
+// "your turn" on the friends button: only where online play is already in use (claude.ai, or a
+// browser that has played online here before), so a solo visitor never loads Firebase or signs in
+let playedOnline = false; try { playedOnline = localStorage.getItem('shellfall-online') === '1'; } catch (e) {}
+setTimeout(() => { if (hasClaude() || playedOnline) refreshDayList().catch(() => {}); }, 600);
 window.addEventListener('pointerdown', () => audioInit(), { once: true });
 document.fonts && document.fonts.ready.then(() => { hudFrame.a = hudFrame.p = null; });
 worldSeed = (Math.random() * 1e9) | 0;
 { const th = rules.theme !== 'random' && THEMES[rules.theme] ? rules.theme : THEME_KEYS[Math.floor(Math.random() * THEME_KEYS.length)]; abyssKind = abyssFor(rules.abyss, th); abyssY = abyssKind ? ABYSS_BASE : H; genTerrain(worldSeed, th); }
-phase = 'menu';
+setPhase('menu');
 const dm = /^#day-(\d{4})$/.exec(location.hash || '');
 if (dm) { $('joinCode').value = dm[1]; $('friendsBox').hidden = false; $('btnFriends').setAttribute('aria-expanded', 'true'); setTimeout(() => $('btnJoin').focus(), 50); }
 const hm = /^#join-(\d{4})$/.exec(location.hash || '');
@@ -6963,7 +7021,7 @@ requestAnimationFrame(frame);
 
 // Hooks for automated testing
 window.__shellfall = {
-  get phase() { return phase; }, get tanks() { return tanks; }, get worm() { return worm; }, get cur() { return cur; }, get projs() { return projs; },
+  get phase() { return phase; }, get phaseErrors() { return phaseErrors.slice(); }, get day() { return DAY; }, get ffHeld() { return ffHeld; }, get tanks() { return tanks; }, get worm() { return worm; }, get cur() { return cur; }, get projs() { return projs; },
   get tickN() { return tickN; }, get kc() { return kc; }, get ts() { return ts; }, get turnNo() { return turnNo; }, get net() { return NET; },
   get weatherNow() { return weatherNow; }, get preview() { return preview; }, get S() { return S; }, get round() { return round; }, get shot() { return shot; },
   rules, prefs, grid, W, H, M: { AIR, DIRT, ROCK, SAND, WATER, BED, RUBBLE, LAVA, OBS, OIL, FIRE, ACID, ICE, GAS, POWDER, STEAM, SNOW, METAL, BRUSH, GEM, WOOD }, get landmark() { return landmark; }, get abyssKind() { return abyssKind; }, get moonX() { return moonX; }, get camZ() { return cam.z; }, get ucamZ() { return ucam.z; }, get lastTap() { return lastTap; }, get ledgeWarn() { return ledgeWarn; }, ghostRaw() { const g = preview.ghost, o = {}; for (const k of Object.keys(g)) { const v = g[k]; if (typeof v === "number" && (isNaN(v) || Object.is(v, -0) || !Number.isInteger(v))) o[k] = String(v); else if (v === undefined) o[k] = "undef"; } return o; }, probeStep(dir) { const g = preview.ghost, p = JSON.parse(JSON.stringify(g)), y0 = p.y; const ok = driveStep(p, cur, dir, true); return { ok, x: p.x, y: p.y, dy: p.y - y0, alive: p.alive, fuel: g.fuel, locked: g.locked, air: g.air }; }, drive(dir, n) { moveDir = dir; const log = []; for (let i = 0; i < n; i++) { driveFrame(0.05); log.push(preview.ghost.x + ":" + preview.ghost.y); } moveDir = 0; return log; }, lastShotOf(k) { return lastShot[tanks[k].id]; }, camReset() { camFocus = null; cam.x = W / 2; cam.y = H / 2; cam.z = 1; }, get TH() { return TH; }, get abyssY() { return abyssY; },
